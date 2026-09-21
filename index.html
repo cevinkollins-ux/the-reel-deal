@@ -302,7 +302,10 @@ function buildCategoryPool(excludeActors){
   DECADES.forEach(d => pool.push({type:"decade", label:`Released in the ${d}s`, value:d}));
   DIRECTORS.forEach(d => pool.push({type:"director", label:`Directed by ${d}`, value:d}));
   COLLECTIONS.forEach(c => pool.push({type:"collection", label:c, value:c}));
-  ACTOR_POOL.filter(a => !excludeActors.includes(a)).forEach(a =>
+  // Only sample a subset of possible co-star candidates — testing all ~180
+  // other actors for a shared credit is too many API calls per deal.
+  const costarCandidates = sample(ACTOR_POOL.filter(a => !excludeActors.includes(a)), 15);
+  costarCandidates.forEach(a =>
     pool.push({type:"costar", label:`Co-starred with ${a}`, value:a})
   );
   return pool;
@@ -361,11 +364,172 @@ async function findPersonId(name){
   return null;
 }
 
-function dealPuzzle(){
+// ---------- Solvability checking ----------
+// Before a puzzle is shown, every actor x category cell is verified to have
+// at least one real answer, so you never get stuck on an impossible pairing.
+
+let genreNameToId = null;
+async function ensureGenreMap(){
+  if(genreNameToId) return genreNameToId;
+  const data = await tmdb("/genre/movie/list");
+  genreNameToId = {};
+  (data.genres || []).forEach(g => { genreNameToId[g.name] = g.id; });
+  return genreNameToId;
+}
+
+const personCache = new Map(); // name(lower) -> {id, credits}
+async function getActorProfile(name){
+  const key = name.toLowerCase();
+  if(personCache.has(key)) return personCache.get(key);
+  const id = await findPersonId(name);
+  if(id == null){
+    const empty = {id:null, credits:[]};
+    personCache.set(key, empty);
+    return empty;
+  }
+  const data = await tmdb(`/person/${id}/movie_credits`);
+  const credits = (data.cast || [])
+    .map(m => ({
+      id:m.id, title:m.title, genre_ids:m.genre_ids || [],
+      release_date:m.release_date, popularity:m.popularity || 0, vote_count:m.vote_count || 0
+    }))
+    .sort((a,b) => (b.popularity||0) - (a.popularity||0));
+  const profile = {id, credits};
+  personCache.set(key, profile);
+  return profile;
+}
+
+const MOVIE_LOOKUP_CAP = 20; // most-popular-first cap on per-movie detail lookups
+
+const movieDetailCache = new Map(); // movieId -> {directors:[lower names], collection: lower string|null}
+async function getMovieDirectorCollection(movieId){
+  if(movieDetailCache.has(movieId)) return movieDetailCache.get(movieId);
+  const details = await tmdb(`/movie/${movieId}`, {append_to_response:"credits"});
+  const directors = (details.credits?.crew || [])
+    .filter(p => p.job === "Director")
+    .map(p => normalizeName(p.name));
+  const collection = details.belongs_to_collection ? details.belongs_to_collection.name.toLowerCase() : null;
+  const info = {directors, collection};
+  movieDetailCache.set(movieId, info);
+  return info;
+}
+
+function actorHasGenre(profile, genreId){
+  return profile.credits.some(m => m.genre_ids.includes(genreId));
+}
+
+function actorHasDecade(profile, decade){
+  return profile.credits.some(m => {
+    if(!m.release_date) return false;
+    const year = parseInt(m.release_date.slice(0,4));
+    return !isNaN(year) && Math.floor(year/10)*10 === decade;
+  });
+}
+
+async function actorHasDirector(profile, directorName){
+  const target = normalizeName(directorName);
+  for(const m of profile.credits.slice(0, MOVIE_LOOKUP_CAP)){
+    const info = await getMovieDirectorCollection(m.id);
+    if(info.directors.includes(target)) return true;
+  }
+  return false;
+}
+
+async function actorHasCollection(profile, collectionQuery){
+  const q = collectionQuery.toLowerCase();
+  const qShort = q.split(":")[0].trim();
+  for(const m of profile.credits.slice(0, MOVIE_LOOKUP_CAP)){
+    const info = await getMovieDirectorCollection(m.id);
+    if(info.collection && (info.collection.includes(qShort) || info.collection.includes(q))) return true;
+  }
+  return false;
+}
+
+async function actorsShareCredit(profileA, profileB){
+  if(!profileB.id) return false;
+  const idsB = new Set(profileB.credits.map(m => m.id));
+  return profileA.credits.some(m => idsB.has(m.id));
+}
+
+async function categoryValidForAll(cat, actorProfiles){
+  if(cat.type === "genre"){
+    const gid = genreNameToId[cat.value];
+    return actorProfiles.every(p => actorHasGenre(p, gid));
+  }
+  if(cat.type === "decade"){
+    return actorProfiles.every(p => actorHasDecade(p, cat.value));
+  }
+  if(cat.type === "director"){
+    for(const p of actorProfiles){ if(!(await actorHasDirector(p, cat.value))) return false; }
+    return true;
+  }
+  if(cat.type === "collection"){
+    for(const p of actorProfiles){ if(!(await actorHasCollection(p, cat.value))) return false; }
+    return true;
+  }
+  if(cat.type === "costar"){
+    const costarProfile = await getActorProfile(cat.value);
+    for(const p of actorProfiles){ if(!(await actorsShareCredit(p, costarProfile))) return false; }
+    return true;
+  }
+  return false;
+}
+
+const MAX_ACTOR_ATTEMPTS = 6;   // re-sample the actor trio this many times if needed
+const MAX_CATEGORY_CANDIDATES = 60; // give up on this trio after trying this many categories
+
+async function pickSolvablePuzzle(){
+  await ensureGenreMap();
+
+  for(let attempt = 0; attempt < MAX_ACTOR_ATTEMPTS; attempt++){
+    const actors = sample(ACTOR_POOL, 3);
+    el("statusLine").textContent = `Dealing... checking ${actors.join(", ")}`;
+
+    const actorProfiles = [];
+    for(const name of actors) actorProfiles.push(await getActorProfile(name));
+    if(actorProfiles.some(p => !p.id || p.credits.length === 0)) continue;
+
+    const catPool = buildCategoryPool(actors);
+    const shuffledCategories = sample(catPool, catPool.length); // full shuffle
+    const categories = [];
+    let tested = 0;
+
+    for(const cand of shuffledCategories){
+      if(categories.length >= 3) break;
+      if(tested >= MAX_CATEGORY_CANDIDATES) break;
+      const dup = categories.some(c => c.type === cand.type && c.value === cand.value);
+      if(dup) continue;
+      tested++;
+      el("statusLine").textContent = `Dealing... testing "${cand.label}" (${categories.length}/3 set)`;
+      if(await categoryValidForAll(cand, actorProfiles)) categories.push(cand);
+    }
+
+    if(categories.length === 3) return {actors, categories};
+  }
+
+  return null;
+}
+
+async function dealPuzzle(){
+  el("newPuzzle").disabled = true;
   el("statusLine").textContent = "Dealing...";
-  const actors = sample(ACTOR_POOL, 3);
-  const catPool = buildCategoryPool(actors);
-  const categories = sample(catPool, 3);
+
+  let result;
+  try{
+    result = await pickSolvablePuzzle();
+  } catch(err){
+    el("statusLine").textContent = err.message || "Something went wrong dealing a puzzle.";
+    el("newPuzzle").disabled = false;
+    return;
+  }
+
+  if(!result){
+    el("statusLine").textContent = "Couldn't find a fully solvable puzzle just now — click Deal again.";
+    el("newPuzzle").disabled = false;
+    return;
+  }
+
+  const {actors, categories} = result;
   puzzle = {actors, categories};
   cellAnswers = {};
   usedMovieIds = new Set();
@@ -375,7 +539,8 @@ function dealPuzzle(){
   el("totalScore").textContent = "0";
   el("filledCount").textContent = "0 / 9 filled";
   el("usedList").textContent = "";
-  el("statusLine").textContent = "New puzzle dealt.";
+  el("statusLine").textContent = "New puzzle dealt — every cell has been checked for a valid answer.";
+  el("newPuzzle").disabled = false;
 
   categories.forEach((c,i) => { el("cat"+i).textContent = c.label; });
 
