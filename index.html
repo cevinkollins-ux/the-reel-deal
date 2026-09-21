@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reel Ledger — MovieGrid Practice</title>
+<style>
+  :root{
+    --paper:#efe9dc;
+    --ink:#211d16;
+    --ledger-line:#c9bfa5;
+    --gold:#a8792f;
+    --brass:#8a6a2f;
+    --correct:#3f5d3a;
+    --correct-bg:#e2ead9;
+    --wrong:#8c3b2e;
+    --wrong-bg:#f3ddd6;
+    --card:#f7f3e8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image:
+      repeating-linear-gradient(180deg, transparent 0, transparent 34px, var(--ledger-line) 35px);
+    color:var(--ink);
+    font-family: "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  .wrap{max-width:820px;margin:0 auto;}
+  header{
+    text-align:left;
+    border-bottom:3px double var(--ink);
+    padding-bottom:14px;
+    margin-bottom:22px;
+  }
+  h1{
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight:700;
+    font-style:italic;
+    font-size:2.1rem;
+    margin:0 0 4px;
+    letter-spacing:0.3px;
+  }
+  .sub{
+    font-size:0.95rem;
+    color:#5a5240;
+    max-width:60ch;
+    line-height:1.5;
+  }
+  .setup{
+    background:var(--card);
+    border:1px solid var(--ledger-line);
+    padding:16px 18px;
+    margin-bottom:22px;
+  }
+  .setup label{display:block;font-size:0.85rem;margin-bottom:6px;color:#5a5240;}
+  .setup .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  input[type=password], input[type=text]{
+    font-family:inherit;
+    font-size:0.95rem;
+    padding:8px 10px;
+    border:1px solid var(--ledger-line);
+    background:#fff;
+    min-width:220px;
+    flex:1;
+  }
+  button{
+    font-family:inherit;
+    font-size:0.9rem;
+    padding:9px 16px;
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    cursor:pointer;
+  }
+  button:hover{background:#3a3323;}
+  button.secondary{
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--ink);
+  }
+  button.secondary:hover{background:rgba(0,0,0,0.06);}
+  button:disabled{opacity:0.4;cursor:not-allowed;}
+  .status-line{font-size:0.85rem;color:#5a5240;margin-top:8px;min-height:1.2em;}
+
+  .scoreboard{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:14px;
+  }
+  .scoreboard .total{font-size:1.6rem;font-weight:700;}
+  .scoreboard .label{font-size:0.8rem;color:#5a5240;}
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    background:var(--card);
+    table-layout:fixed;
+  }
+  table.grid th, table.grid td{
+    border:1px solid var(--ledger-line);
+    padding:10px;
+    vertical-align:top;
+    text-align:left;
+  }
+  table.grid th{
+    background:#e4dcc7;
+    font-weight:700;
+    font-size:0.92rem;
+  }
+  table.grid th.corner{background:var(--paper);border:none;}
+  td.cell{width:33%;height:120px;position:relative;}
+  .cell input{
+    width:100%;
+    font-size:0.88rem;
+    padding:6px 7px;
+    border:1px solid var(--ledger-line);
+    background:#fff;
+  }
+  .cell .go{
+    margin-top:6px;
+    font-size:0.78rem;
+    padding:5px 10px;
+  }
+  .ac-wrap{position:relative;}
+  .ac-list{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    background:#fff;
+    border:1px solid var(--ledger-line);
+    max-height:160px;
+    overflow-y:auto;
+    z-index:30;
+    list-style:none;
+    margin:2px 0 0;
+    padding:0;
+    display:none;
+    box-shadow:0 3px 6px rgba(0,0,0,0.15);
+  }
+  .ac-list li{
+    padding:6px 8px;
+    font-size:0.8rem;
+    cursor:pointer;
+    border-bottom:1px solid #ece5d3;
+  }
+  .ac-list li:last-child{border-bottom:none;}
+  .ac-list li:hover, .ac-list li.active{background:#e4dcc7;}
+  .cell.correct{background:var(--correct-bg);}
+  .cell.wrong-flash{background:var(--wrong-bg);}
+  .answer{
+    font-size:0.85rem;
+    line-height:1.35;
+  }
+  .answer .movie-title{font-weight:700;color:var(--correct);}
+  .answer .pts{
+    display:block;
+    margin-top:3px;
+    font-size:0.75rem;
+    color:#5a5240;
+  }
+  .fail-msg{
+    font-size:0.78rem;
+    color:var(--wrong);
+    margin-top:5px;
+    min-height:1em;
+  }
+  .used-list{
+    margin-top:26px;
+    font-size:0.8rem;
+    color:#5a5240;
+  }
+  footer{
+    margin-top:30px;
+    font-size:0.75rem;
+    color:#7a7259;
+    text-align:center;
+  }
+  @media (max-width:640px){
+    table.grid th, table.grid td{padding:6px;font-size:0.8rem;}
+    td.cell{height:140px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>The Reel Ledger</h1>
+    <div class="sub">A practice grid, in the spirit of MovieGrid.io. Name a film linking each actor to each category — full marks for a valid answer, extra credit for pulling something obscure.</div>
+  </header>
+
+  <div class="setup">
+    <label for="apiKey">TMDb API key (v3 auth, kept only in this browser)</label>
+    <div class="row">
+      <input type="password" id="apiKey" placeholder="Paste your TMDb API key">
+      <button id="saveKey">Save key</button>
+      <button id="newPuzzle" class="secondary" disabled>Deal a new puzzle</button>
+    </div>
+    <div class="status-line" id="statusLine">Get a free key at themoviedb.org → Settings → API, then paste it above.</div>
+  </div>
+
+  <div id="game" style="display:none;">
+    <div class="scoreboard">
+      <div><span class="total" id="totalScore">0</span> <span class="label">pts</span></div>
+      <div class="label" id="filledCount">0 / 9 filled</div>
+    </div>
+    <table class="grid">
+      <thead>
+        <tr>
+          <th class="corner"></th>
+          <th id="cat0"></th>
+          <th id="cat1"></th>
+          <th id="cat2"></th>
+        </tr>
+      </thead>
+      <tbody id="gridBody"></tbody>
+    </table>
+    <div class="used-list" id="usedList"></div>
+  </div>
+
+  <footer>Data from TMDb. Rarity score is based on TMDb's vote count for the film you name, not IMDb's.</footer>
+</div>
+
+<script>
+const TMDB_BASE = "https://api.themoviedb.org/3";
+
+// ---------- Actor pool (famous actors, ~1990–present) ----------
+const ACTORS = [
+"Tom Hanks","Denzel Washington","Meryl Streep","Julia Roberts","Brad Pitt","Leonardo DiCaprio",
+"Sandra Bullock","Will Smith","Nicole Kidman","Russell Crowe","Cate Blanchett","Johnny Depp",
+"Angelina Jolie","Matt Damon","Tom Cruise","Reese Witherspoon","George Clooney","Charlize Theron",
+"Robert Downey Jr.","Scarlett Johansson","Christian Bale","Natalie Portman","Hugh Jackman","Emma Stone",
+"Ryan Gosling","Jennifer Lawrence","Chris Evans","Chris Hemsworth","Mark Ruffalo","Samuel L. Jackson",
+"Morgan Freeman","Anthony Hopkins","Kevin Spacey","Gary Oldman","Edward Norton","Kate Winslet",
+"Joaquin Phoenix","Amy Adams","Viola Davis","Octavia Spencer","Mahershala Ali","Michael B. Jordan",
+"Denzel Curry","Zendaya","Timothée Chalamet","Florence Pugh","Saoirse Ronan","Margot Robbie",
+"Anne Hathaway","Emily Blunt","Rachel McAdams","Ryan Reynolds","Jake Gyllenhaal","Paul Rudd",
+"Steve Carell","Jim Carrey","Adam Sandler","Ben Stiller","Owen Wilson","Vince Vaughn",
+"Will Ferrell","Seth Rogen","Jonah Hill","Emma Watson","Daniel Radcliffe","Rupert Grint",
+"Keira Knightley","Orlando Bloom","Elijah Wood","Ian McKellen","Viggo Mortensen","Liv Tyler",
+"Sigourney Weaver","Harrison Ford","Mark Hamill","Carrie Fisher","Samuel L Jackson","Ewan McGregor",
+"Natalie Wood","Uma Thurman","John Travolta","Samuel Jackson","Bruce Willis","Sylvester Stallone",
+"Arnold Schwarzenegger","Jean-Claude Van Damme","Vin Diesel","Dwayne Johnson","Jason Statham","Michelle Rodriguez",
+"Paul Walker","Charlize Theron","Tom Hardy","Idris Elba","Chiwetel Ejiofor","David Oyelowo",
+"Forest Whitaker","Don Cheadle","Jamie Foxx","Terrence Howard","Halle Berry","Zoe Saldana",
+"Karen Gillan","Elizabeth Olsen","Paul Bettany","Jeremy Renner","Chris Pratt","Bradley Cooper",
+"Sean Penn","Tim Robbins","Kevin Costner","Susan Sarandon","Julianne Moore","Frances McDormand",
+"Joel Coen","Holly Hunter","Laura Dern","Jeff Goldblum","Sam Neill","Richard Attenborough",
+"Michael Douglas","Kathleen Turner","Glenn Close","Jack Nicholson","Diane Keaton","Al Pacino",
+"Robert De Niro","Joe Pesci","Ray Liotta","Lorraine Bracco","Michael Caine","Christian Bale",
+"Heath Ledger","Aaron Eckhart","Maggie Gyllenhaal","Anne Hathaway","Tom Hardy","Marion Cotillard",
+"Ellen Page","Joseph Gordon-Levitt","Cillian Murphy","Emily Watson","Kenneth Branagh","Emma Thompson",
+"Colin Firth","Geoffrey Rush","Helena Bonham Carter","Judi Dench","Ralph Fiennes","Rachel Weisz",
+"Naomi Watts","Nicolas Cage","John Cusack","Winona Ryder","Christian Slater","Ethan Hawke",
+"Julie Delpy","Michael Keaton","Val Kilmer","Tommy Lee Jones","Will Smith","Josh Brolin",
+"Benicio del Toro","Javier Bardem","Penélope Cruz","Antonio Banderas","Salma Hayek","Gael García Bernal",
+"Diego Luna","Alfonso Cuarón","Guillermo del Toro","Michelle Yeoh","Chow Yun-fat","Jet Li",
+"Ken Watanabe","Rinko Kikuchi","Awkwafina","Constance Wu","Henry Golding","John Cho",
+"Lucy Liu","Sandra Oh","Steven Yeun","Kumail Nanjiani","Aziz Ansari","Mindy Kaling",
+"Priyanka Chopra","Dev Patel","Riz Ahmed","Idris Elba","David Harbour","Winona Ryder",
+"Millie Bobby Brown","Finn Wolfhard","Noah Schnapp","Gaten Matarazzo","Tom Holland","Zendaya",
+"Jacob Batalon","Marisa Tomei","Michael Keaton","J.K. Simmons","Miles Teller","Emma Stone",
+"Ryan Gosling","Amy Adams","Bradley Cooper","Sam Rockwell","Frances McDormand","Woody Harrelson",
+"Regina King","Taraji P. Henson","Octavia Spencer","Janelle Monáe","Kevin Costner","Chadwick Boseman",
+"Letitia Wright","Danai Gurira","Lupita Nyong'o","Winston Duke","Angela Bassett","Martin Freeman",
+"Andy Serkis","Benedict Cumberbatch","Tilda Swinton","Rachel McAdams","Mads Mikkelsen","Willem Dafoe",
+"Michael Shannon","Jessica Chastain","Bryce Dallas Howard","Judy Greer","Vera Farmiga","John Krasinski",
+"Emily Blunt","Domhnall Gleeson","Adam Driver","Daisy Ridley","Oscar Isaac","John Boyega",
+"Felicity Jones","Alden Ehrenreich","Donald Glover","Woody Harrelson","Paul Dano","Michael Fassbender",
+"James McAvoy","Jennifer Lawrence","Nicholas Hoult","Sophie Turner","Evan Peters","Zoe Kravitz",
+"Robert Pattinson","Kristen Stewart","Taylor Lautner","Anna Kendrick","Rebel Wilson","Melissa McCarthy",
+"Sofía Vergara","Charlize Theron","Amy Poehler","Tina Fey","Kristen Wiig","Maya Rudolph"
+];
+// de-dup
+const ACTOR_POOL = [...new Set(ACTORS)];
+
+// ---------- Category pool ----------
+const GENRES = ["Comedy","Drama","Action","Horror","Science Fiction","Romance","Crime","Thriller","Animation","Fantasy","War","Adventure","Mystery","Family","Music"];
+const DECADES = [1990,2000,2010,2020];
+const DIRECTORS = [
+"Steven Spielberg","Martin Scorsese","Christopher Nolan","Quentin Tarantino","David Fincher",
+"Ridley Scott","James Cameron","Denis Villeneuve","Wes Anderson","Coen Brothers",
+"Paul Thomas Anderson","Guillermo del Toro","Alfonso Cuarón","Peter Jackson","Ron Howard",
+"Clint Eastwood","Michael Bay","J.J. Abrams","Sam Mendes","Bong Joon-ho",
+"Greta Gerwig","Jordan Peele","Damien Chazelle","Alejandro González Iñárritu","Kathryn Bigelow",
+"Taika Waititi","Edgar Wright","Spike Lee","Tim Burton","Robert Zemeckis"
+];
+const COLLECTIONS = [
+"Marvel Cinematic Universe","Star Wars","Harry Potter","Fast & Furious","James Bond",
+"Mission: Impossible","The Lord of the Rings","X-Men","Jurassic Park","Ocean's",
+"The Dark Knight","Shrek","Toy Story","Rocky","Transformers","The Hunger Games",
+"Pirates of the Caribbean","John Wick","Spider-Man","The Matrix"
+];
+
+function buildCategoryPool(excludeActors){
+  const pool = [];
+  GENRES.forEach(g => pool.push({type:"genre", label:g, value:g}));
+  DECADES.forEach(d => pool.push({type:"decade", label:`Released in the ${d}s`, value:d}));
+  DIRECTORS.forEach(d => pool.push({type:"director", label:`Directed by ${d}`, value:d}));
+  COLLECTIONS.forEach(c => pool.push({type:"collection", label:c, value:c}));
+  ACTOR_POOL.filter(a => !excludeActors.includes(a)).forEach(a =>
+    pool.push({type:"costar", label:`Co-starred with ${a}`, value:a})
+  );
+  return pool;
+}
+
+function sample(arr, n){
+  const copy = [...arr];
+  const out = [];
+  while(out.length < n && copy.length){
+    const i = Math.floor(Math.random()*copy.length);
+    out.push(copy.splice(i,1)[0]);
+  }
+  return out;
+}
+
+// ---------- App state ----------
+let apiKey = localStorage.getItem("tmdb_key") || "";
+let puzzle = null; // {actors:[3], categories:[3]}
+let cellAnswers = {}; // "r-c" -> {title, id, points}
+let usedMovieIds = new Set();
+let totalScore = 0;
+
+const el = id => document.getElementById(id);
+
+el("apiKey").value = apiKey;
+if(apiKey){
+  el("statusLine").textContent = "Key loaded from this browser. Ready to deal a puzzle.";
+  el("newPuzzle").disabled = false;
+}
+
+el("saveKey").addEventListener("click", () => {
+  apiKey = el("apiKey").value.trim();
+  if(!apiKey){ el("statusLine").textContent = "Enter a key first."; return; }
+  localStorage.setItem("tmdb_key", apiKey);
+  el("statusLine").textContent = "Key saved. Ready to deal a puzzle.";
+  el("newPuzzle").disabled = false;
+});
+
+el("newPuzzle").addEventListener("click", dealPuzzle);
+
+async function tmdb(path, params={}){
+  const url = new URL(TMDB_BASE + path);
+  url.searchParams.set("api_key", apiKey);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  if(!res.ok){
+    if(res.status === 401) throw new Error("TMDb rejected the API key.");
+    throw new Error("TMDb request failed (" + res.status + ")");
+  }
+  return res.json();
+}
+
+async function findPersonId(name){
+  const data = await tmdb("/search/person", {query:name});
+  if(data.results && data.results.length) return data.results[0].id;
+  return null;
+}
+
+function dealPuzzle(){
+  el("statusLine").textContent = "Dealing...";
+  const actors = sample(ACTOR_POOL, 3);
+  const catPool = buildCategoryPool(actors);
+  const categories = sample(catPool, 3);
+  puzzle = {actors, categories};
+  cellAnswers = {};
+  usedMovieIds = new Set();
+  totalScore = 0;
+
+  el("game").style.display = "block";
+  el("totalScore").textContent = "0";
+  el("filledCount").textContent = "0 / 9 filled";
+  el("usedList").textContent = "";
+  el("statusLine").textContent = "New puzzle dealt.";
+
+  categories.forEach((c,i) => { el("cat"+i).textContent = c.label; });
+
+  const body = el("gridBody");
+  body.innerHTML = "";
+  actors.forEach((actor, r) => {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.textContent = actor;
+    tr.appendChild(th);
+    categories.forEach((cat, c) => {
+      const td = document.createElement("td");
+      td.className = "cell";
+      td.id = `cell-${r}-${c}`;
+      td.innerHTML = `
+        <div class="ac-wrap">
+          <input type="text" id="input-${r}-${c}" placeholder="Name a film..." autocomplete="off">
+          <ul class="ac-list" id="ac-${r}-${c}"></ul>
+        </div>
+        <button class="go" data-r="${r}" data-c="${c}">Submit</button>
+        <div class="fail-msg" id="fail-${r}-${c}"></div>
+      `;
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll("button.go").forEach(btn => {
+    btn.addEventListener("click", () => submitGuess(parseInt(btn.dataset.r), parseInt(btn.dataset.c)));
+  });
+  body.querySelectorAll("input[type=text]").forEach(inp => {
+    const [_, r, c] = inp.id.split("-");
+    const list = el(`ac-${r}-${c}`);
+
+    inp.addEventListener("input", () => {
+      const key = `${r}-${c}`;
+      delete cellSelections[key];
+      const q = inp.value.trim();
+      if(q.length < 2){ list.style.display = "none"; list.innerHTML = ""; return; }
+      debounce(key, () => doAutocomplete(r, c, q));
+    });
+
+    inp.addEventListener("keydown", e => {
+      if(e.key === "Enter"){
+        list.style.display = "none";
+        submitGuess(parseInt(r), parseInt(c));
+      } else if(e.key === "Escape"){
+        list.style.display = "none";
+      }
+    });
+
+    inp.addEventListener("blur", () => {
+      setTimeout(() => { list.style.display = "none"; }, 150);
+    });
+  });
+}
+
+const debounceTimers = {};
+function debounce(key, fn, delay=300){
+  clearTimeout(debounceTimers[key]);
+  debounceTimers[key] = setTimeout(fn, delay);
+}
+
+let cellSelections = {};
+
+async function doAutocomplete(r, c, query){
+  const list = el(`ac-${r}-${c}`);
+  try{
+    const data = await tmdb("/search/movie", {query});
+    if(!data.results || !data.results.length){
+      list.style.display = "none";
+      list.innerHTML = "";
+      return;
+    }
+    const top = data.results.slice(0, 8);
+    const counts = {};
+    top.forEach(m => {
+      const t = m.title.toLowerCase();
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    list.innerHTML = "";
+    top.forEach(m => {
+      const t = m.title.toLowerCase();
+      const year = m.release_date ? m.release_date.slice(0, 4) : "";
+      const showYear = counts[t] >= 2 && year;
+      const li = document.createElement("li");
+      li.textContent = showYear ? `${m.title} (${year})` : m.title;
+      li.addEventListener("mousedown", e => {
+        e.preventDefault();
+        el(`input-${r}-${c}`).value = m.title;
+        cellSelections[`${r}-${c}`] = {id: m.id, title: m.title};
+        list.style.display = "none";
+        list.innerHTML = "";
+      });
+      list.appendChild(li);
+    });
+    list.style.display = "block";
+  } catch(err){
+    list.style.display = "none";
+  }
+}
+
+function rarityScore(voteCount){
+  const vc = Math.max(voteCount, 0);
+  const lg = Math.log10(vc + 1); // ~0 (0 votes) to ~4.5 (30k+ votes)
+  let score = 50 - ((lg - 0.7) / (4.3 - 0.7)) * 49;
+  return Math.max(1, Math.min(50, Math.round(score)));
+}
+
+async function submitGuess(r, c){
+  const key = `${r}-${c}`;
+  if(cellAnswers[key]) return; // already solved
+  const input = el(`input-${r}-${c}`);
+  const failEl = el(`fail-${r}-${c}`);
+  const title = input.value.trim();
+  if(!title){ failEl.textContent = "Type a film title first."; return; }
+  failEl.textContent = "Checking...";
+
+  const actorName = puzzle.actors[r];
+  const cat = puzzle.categories[c];
+
+  try{
+    let movieId;
+    const sel = cellSelections[key];
+    if(sel && sel.title === title){
+      movieId = sel.id;
+    } else {
+      const search = await tmdb("/search/movie", {query:title});
+      if(!search.results || !search.results.length){
+        failEl.textContent = "No film found by that title.";
+        return;
+      }
+      movieId = search.results[0].id;
+    }
+    if(usedMovieIds.has(movieId)){
+      failEl.textContent = "Already used that film elsewhere in the grid.";
+      return;
+    }
+    const details = await tmdb(`/movie/${movieId}`, {append_to_response:"credits"});
+
+    const castNames = (details.credits.cast || []).map(p => p.name.toLowerCase());
+    if(!castNames.includes(actorName.toLowerCase())){
+      failEl.textContent = `${actorName} isn't credited as an actor in that film.`;
+      return;
+    }
+
+    let catOk = false;
+    if(cat.type === "genre"){
+      catOk = (details.genres || []).some(g => g.name.toLowerCase() === cat.value.toLowerCase());
+    } else if(cat.type === "decade"){
+      const year = details.release_date ? parseInt(details.release_date.slice(0,4)) : null;
+      catOk = year !== null && Math.floor(year/10)*10 === cat.value;
+    } else if(cat.type === "director"){
+      const crew = details.credits.crew || [];
+      catOk = crew.some(p => p.job === "Director" && normalizeName(p.name) === normalizeName(cat.value));
+    } else if(cat.type === "collection"){
+      const collName = details.belongs_to_collection ? details.belongs_to_collection.name.toLowerCase() : "";
+      catOk = collName.includes(cat.value.toLowerCase().split(":")[0].trim().toLowerCase()) ||
+              collName.includes(cat.value.toLowerCase());
+    } else if(cat.type === "costar"){
+      catOk = castNames.includes(cat.value.toLowerCase());
+    }
+
+    if(!catOk){
+      failEl.textContent = `Correct actor, but that film doesn't satisfy "${cat.label}".`;
+      return;
+    }
+
+    const rarity = rarityScore(details.vote_count);
+    const points = 50 + rarity;
+    cellAnswers[key] = {title: details.title, id: movieId, points, rarity};
+    usedMovieIds.add(movieId);
+    delete cellSelections[key];
+    totalScore += points;
+
+    const td = el(`cell-${r}-${c}`);
+    td.className = "cell correct";
+    td.innerHTML = `<div class="answer"><span class="movie-title">${details.title}</span>
+      <span class="pts">+50 completeness, +${rarity} rarity (${details.vote_count} TMDb votes) — ${points} pts</span></div>`;
+
+    el("totalScore").textContent = String(totalScore);
+    el("filledCount").textContent = `${Object.keys(cellAnswers).length} / 9 filled`;
+    refreshUsedList();
+  } catch(err){
+    failEl.textContent = err.message || "Something went wrong.";
+  }
+}
+
+function normalizeName(n){
+  return n.toLowerCase().replace(/[^a-z]/g,"");
+}
+
+function refreshUsedList(){
+  const titles = Object.values(cellAnswers).map(a => a.title);
+  el("usedList").textContent = titles.length ? "Used so far: " + titles.join(", ") : "";
+}
+</script>
+</body>
+</html>
