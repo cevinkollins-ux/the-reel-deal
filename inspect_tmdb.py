@@ -30,7 +30,7 @@ import urllib.request
 from pathlib import Path
 
 # ---- Paste the snippet copied from Sandbox mode here ----
-api_call_to_review = "person_id=287&person_name=Ryan%20Gosling"
+api_call_to_review = "person_id=139&person_name=Uma%20Thurman&movie_id=414419&movie_title=Kill%20Bill%3A%20The%20Whole%20Bloody%20Affair"
 # -----------------------------------------------------------
 
 TMDB_BASE = "https://api.themoviedb.org/3"

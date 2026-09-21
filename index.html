@@ -251,6 +251,28 @@
   .modal-list li.mine{font-weight:700;color:var(--brass);}
   .modal-list li.copyable{cursor:pointer;}
   .modal-list li.copyable:hover{background:#efe4c8;}
+  .toast{
+    position:fixed;
+    top:18px;
+    left:50%;
+    transform:translateX(-50%) translateY(-8px);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--ink);
+    color:var(--paper);
+    padding:10px 18px;
+    font-size:0.85rem;
+    border-radius:3px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.3);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.25s ease, transform 0.25s ease;
+    z-index:200;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast .toast-icon{color:#7fce90; font-weight:700;}
+  .toast.warn .toast-icon{color:#e0a05a;}
   footer{
     margin-top:30px;
     font-size:0.75rem;
@@ -317,6 +339,8 @@
     <div class="modal-body" id="modalBody"></div>
   </div>
 </div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -640,6 +664,15 @@ document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal();
 
 const CAPPED_TYPES = new Set(["director", "collection"]);
 
+let toastTimer = null;
+function showToast(message, ok=true){
+  const toast = el("toast");
+  toast.className = "toast show" + (ok ? "" : " warn");
+  toast.innerHTML = `<span class="toast-icon">${ok ? "✓" : "⚠"}</span><span>${message}</span>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.classList.remove("show"); }, 2200);
+}
+
 // ---------- Sandbox-only: copy a snippet identifying a person/film for inspect_tmdb.py ----------
 // The exact TMDb data our filtering logic (isRealFeatureCredit, category matching) reads is only
 // visible in the raw API response — this hands the IDs needed to fetch it straight to a companion
@@ -653,9 +686,13 @@ function buildApiSnippet(personId, personName, movieId, movieTitle){
 
 function copyToClipboard(text){
   const report = ok => {
-    el("statusLine").textContent = ok
-      ? "API call snippet copied to clipboard — paste it into inspect_tmdb.py."
-      : `Couldn't copy automatically. Copy this manually: ${text}`;
+    if(ok){
+      showToast("API-call snippet copied to clipboard");
+      el("statusLine").textContent = "Paste it into api_call_to_review in inspect_tmdb.py.";
+    } else {
+      showToast("Couldn't copy automatically — see the status line", false);
+      el("statusLine").textContent = `Copy this manually: ${text}`;
+    }
   };
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(() => report(true)).catch(() => report(fallbackCopy(text)));

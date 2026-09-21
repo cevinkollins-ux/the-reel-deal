@@ -49,6 +49,23 @@ Every category comes from one of five fixed types, defined near the top of the `
 
 A deal picks 3 categories at random from the combined pool of all five types (co-star candidates are limited to a random 15 other actors per deal, to keep the solvability check fast).
 
+## Methodology / FAQ
+
+**Does a film need any TMDb votes to count as an answer?**
+Yes — at least 1 (`MIN_VOTE_COUNT` in `index.html`). TMDb's movie catalog includes non-feature entries (making-of featurettes, behind-the-scenes shorts, bonus clips) credited to actors right alongside real films, and these almost always sit at 0 TMDb votes — e.g. "Blade Runner 2049: Behind the Scenes" under Ryan Gosling. `isRealFeatureCredit()` rejects anything with 0 votes, plus anything matching a title-pattern denylist ("behind the scenes," "making of," "bloopers," "deleted scenes," "featurette," etc.) as a second line of defense. This is a heuristic, not a guarantee — see "Open issues" below if one slips through.
+
+**How is the rarity score (1–50) calculated?**
+`rarityScore()` maps a film's TMDb `vote_count` onto a 1–50 scale on a log10 curve: roughly 4 votes or fewer scores the maximum (50), roughly 20,000 votes or more scores the minimum (1), and everything in between is interpolated smoothly on the log scale — so the gap between 10 and 100 votes moves the score a lot more than the gap between 10,000 and 20,000 does. A correct cell is worth 50 points (for a valid answer) + that rarity score, so 51–100 points total per cell.
+
+**Why isn't rarity based on IMDb instead?**
+IMDb has no public API at all, and TMDb has no direct equivalent of an IMDb review count — this app only ever talks to TMDb, so rarity is TMDb's own vote count, not IMDb's.
+
+**Why didn't a film I know an actor is in get accepted for a Director or Franchise/Collection category?**
+Those two category types only check each actor's ~20 most popular films (`MOVIE_LOOKUP_CAP`) — checking every film's director/collection for every actor on every deal would mean far too many TMDb calls. An obscure film outside that window won't be suggested by "See All" or counted toward solvability, but it'll still be accepted if you type its exact title yourself and it actually satisfies the category.
+
+**How does the app guarantee a dealt puzzle is actually solvable?**
+Before showing a puzzle, it fetches real filmographies for the 3 sampled actors and tests category candidates one at a time against all three, only keeping a category once it's confirmed to have a valid answer for every actor. If a trio of actors can't yield 3 solvable categories after enough tries, it resamples a new trio (up to 6 attempts) rather than ever showing an unsolvable grid. (Sandbox mode deliberately bypasses this guarantee — see above.)
+
 ## Getting a TMDb API key
 
 1. Create a free account at [themoviedb.org/signup](https://www.themoviedb.org/signup).
@@ -58,13 +75,13 @@ A deal picks 3 categories at random from the combined pool of all five types (co
 
 ## Notes / known limitations
 
-- Data comes from TMDb, not IMDb — TMDb has no direct IMDb review-count equivalent, so rarity is based on TMDb's own vote count.
-- TMDb's "movie" catalog includes non-feature entries (making-of featurettes, behind-the-scenes shorts, bonus clips) credited alongside real films — e.g. "Blade Runner 2049: Behind the Scenes" shows up in Ryan Gosling's credits. These almost always have 0 TMDb votes, which the rarity formula would otherwise treat as *maximum* rarity, making junk entries look like the best possible answer. `isRealFeatureCredit()` filters anything with 0 votes or a title matching common bonus-content patterns (behind the scenes, making of, bloopers, deleted scenes, featurette, etc.) — applied everywhere a film is considered valid: profile fetching, autocomplete, and submit validation. A genuinely obscure real film with even 1 TMDb vote still counts.
+- See the Methodology / FAQ above for how rarity is scored, why a film needs at least 1 TMDb vote to count, and why Director/Collection categories only look at an actor's ~20 most popular films.
 - The actor pool (~235 names, all with substantial film work from ~1990 to today) and category pool are hardcoded near the top of the `<script>` in `index.html` — edit the `ACTORS`, `DIRECTORS`, and `COLLECTIONS` arrays to tune who/what shows up.
-- Director/collection solvability checks and a grid box's "See All" only look at each actor's ~20 most popular films, not their full filmography — an obscure director credit outside that window won't be suggested or counted toward solvability, even though typing it in yourself would still score. (An actor's own "See All" isn't affected by this — it lists their complete filmography.)
+- An actor's own "See All" (as opposed to a grid box's) isn't affected by the ~20-most-popular-films cap — it lists their complete filmography.
 - Franchise/collection matching is a loose string match against TMDb's `belongs_to_collection` field and can occasionally miss films TMDb doesn't tag into a collection.
 - No award-based categories (e.g. Oscar nominations) since TMDb doesn't track those — would need a separate static dataset to add them.
 
 ## Open issues / to revisit
 
-- **The vote-count filter (`MIN_VOTE_COUNT = 1`) is a heuristic, not a guarantee.** It's plausible a popular "behind the scenes" or "making of" special picks up enough TMDb votes to slip past the filter and the title-pattern denylist (e.g. one not phrased like the usual "X: Behind the Scenes" pattern). If a junk non-feature title turns up again as a valid answer, use `inspect_tmdb.py` (see above) on that actor/film to see the raw TMDb fields (`video`, `genre_ids`, `popularity`, etc.) and figure out a better rule.
+- **The vote-count filter (`MIN_VOTE_COUNT = 1`) is a heuristic, not a guarantee.** It's plausible a popular "behind the scenes" or "making of" special picks up enough TMDb votes to slip past the filter and the title-pattern denylist (e.g. one not phrased like the usual "X: Behind the Scenes" pattern). If a junk non-feature title turns up again as a valid answer, use `inspect_tmdb.py` (see above) on that actor/film to see the raw TMDb fields and figure out a better rule.
+  - Already checked via `inspect_tmdb.py` on Ryan Gosling's real credit list: TMDb's `video` field is **not** a useful signal — it's `false` on obvious junk ("Fight Club: Behind the Scenes," "DC Insiders Run Amuck," fake/hoax listings like "Ocean's Fourteen") *and* on legitimate films, so it can't distinguish the two. Every junk entry checked had `vote_count: 0`, so the current filter is doing its job on that sample. Also verified `MIN_VOTE_COUNT = 1` doesn't over-reject: Uma Thurman's "Kill Bill: The Whole Bloody Affair" (a genuinely rare, festival-only 4-hour cut) has `vote_count: 1423` and passes fine.
