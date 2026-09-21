@@ -174,18 +174,59 @@
     font-size:0.8rem;
     color:#5a5240;
   }
-  .reveal{
-    margin-top:8px;
-    padding-top:6px;
-    border-top:1px dashed var(--ledger-line);
-    font-size:0.75rem;
+  th .actor-name{margin-bottom:4px;}
+  .see-all-btn{
+    font-size:0.72rem;
+    padding:3px 9px;
   }
-  .reveal-title{color:#5a5240;margin-bottom:3px;}
-  .reveal-list{list-style:none;margin:0;padding:0;}
-  .reveal-list li{padding:1px 0;color:var(--ink);}
-  .reveal-list li.mine{font-weight:700;color:var(--brass);}
-  .reveal-more{color:#8a8265;margin-top:2px;}
-  .reveal-empty{color:#8a8265;font-style:italic;}
+  .see-all-wrap{margin-top:6px;}
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(33,29,22,0.55);
+    z-index:100;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .modal-box{
+    background:var(--card);
+    border:1px solid var(--ledger-line);
+    max-width:480px;
+    width:100%;
+    max-height:80vh;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);
+  }
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:12px 16px;
+    border-bottom:1px solid var(--ledger-line);
+    font-weight:700;
+  }
+  .modal-close-btn{
+    padding:3px 9px;
+    font-size:0.85rem;
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--ink);
+  }
+  .modal-body{
+    padding:12px 16px;
+    overflow-y:auto;
+    font-size:0.85rem;
+  }
+  .modal-status{color:#5a5240;font-style:italic;}
+  .modal-note{color:#8a8265;font-size:0.75rem;margin-bottom:8px;}
+  .modal-list{list-style:none;margin:0;padding:0;}
+  .modal-list li{padding:4px 0;border-bottom:1px solid #ece5d3;}
+  .modal-list li:last-child{border-bottom:none;}
+  .modal-list li.mine{font-weight:700;color:var(--brass);}
   footer{
     margin-top:30px;
     font-size:0.75rem;
@@ -219,7 +260,7 @@
     <div class="scoreboard">
       <div><span class="total" id="totalScore">0</span> <span class="label">pts</span></div>
       <div class="label" id="filledCount">0 / 9 filled</div>
-      <button id="revealBtn" class="secondary" disabled>Reveal best answers</button>
+      <button id="seeAllReadyBtn" class="secondary" disabled>Ready to see answers</button>
     </div>
     <table class="grid">
       <thead>
@@ -236,6 +277,16 @@
   </div>
 
   <footer>Data from TMDb. Rarity score is based on TMDb's vote count for the film you name, not IMDb's.</footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="modalTitle"></span>
+      <button id="modalClose" class="modal-close-btn">Close</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
 </div>
 
 <script>
@@ -518,53 +569,110 @@ async function getValidFilms(actorProfile, cat){
     matches = actorProfile.credits.filter(m => idsB.has(m.id));
   }
   return matches
-    .map(m => ({title:m.title, id:m.id, vote_count:m.vote_count, rarity:rarityScore(m.vote_count)}))
-    .sort((a,b) => b.rarity - a.rarity);
+    .map(m => ({title:m.title, id:m.id, vote_count:m.vote_count, release_date:m.release_date, rarity:rarityScore(m.vote_count)}))
+    .sort((a,b) => (b.rarity - a.rarity) || b.title.localeCompare(a.title)); // rarity desc, title desc
 }
 
-const REVEAL_SHOWN = 8; // how many top answers to list per cell before collapsing into "+N more"
+// ---------- "See All" modal: full answer list for one cell or one actor ----------
 
-function renderReveal(r, c, films){
-  const box = el(`reveal-${r}-${c}`);
-  if(!box) return;
-  if(!films.length){
-    box.innerHTML = `<div class="reveal-empty">No matches found among this actor's most notable films.</div>`;
-    return;
-  }
-  const yourTitle = cellAnswers[`${r}-${c}`] ? cellAnswers[`${r}-${c}`].title.toLowerCase() : null;
-  const shown = films.slice(0, REVEAL_SHOWN);
-  const rows = shown.map((f,i) => {
-    const mine = yourTitle && f.title.toLowerCase() === yourTitle;
-    const pts = 50 + f.rarity;
-    return `<li class="${mine ? "mine" : ""}">${i===0 ? "★ " : ""}${f.title} — ${pts} pts (${f.rarity} rarity, ${f.vote_count} votes)${mine ? " — your pick" : ""}</li>`;
-  }).join("");
-  const more = films.length > shown.length
-    ? `<div class="reveal-more">+${films.length - shown.length} more valid film(s)</div>` : "";
-  box.innerHTML = `<div class="reveal-title">Best options (${films.length} total):</div><ul class="reveal-list">${rows}</ul>${more}`;
+function openModal(title, bodyHtml){
+  el("modalTitle").textContent = title;
+  el("modalBody").innerHTML = bodyHtml;
+  el("modalOverlay").style.display = "flex";
 }
+function setModalBody(html){
+  el("modalBody").innerHTML = html;
+}
+function closeModal(){
+  el("modalOverlay").style.display = "none";
+}
+el("modalClose").addEventListener("click", closeModal);
+el("modalOverlay").addEventListener("click", e => { if(e.target.id === "modalOverlay") closeModal(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(); });
 
-async function revealAllAnswers(){
-  if(!puzzle) return;
-  el("revealBtn").disabled = true;
+const CAPPED_TYPES = new Set(["director", "collection"]);
+
+async function openCellSeeAll(r, c){
+  const actorName = puzzle.actors[r];
+  const cat = puzzle.categories[c];
+  openModal(`${actorName} — ${cat.label}`, `<div class="modal-status">Loading matches…</div>`);
   try{
-    for(let r=0; r<puzzle.actors.length; r++){
-      const actorProfile = await getActorProfile(puzzle.actors[r]);
-      for(let c=0; c<puzzle.categories.length; c++){
-        const cat = puzzle.categories[c];
-        el("statusLine").textContent = `Revealing... ${puzzle.actors[r]} × ${cat.label}`;
-        const films = await getValidFilms(actorProfile, cat);
-        renderReveal(r, c, films);
-      }
+    const profile = await getActorProfile(actorName);
+    const films = await getValidFilms(profile, cat);
+    if(!films.length){
+      setModalBody(`<div class="modal-status">No matches found${CAPPED_TYPES.has(cat.type) ? " among this actor's most notable films" : ""}.</div>`);
+      return;
     }
-    el("statusLine").textContent = "Best answers revealed for every cell.";
+    const yourTitle = cellAnswers[`${r}-${c}`] ? cellAnswers[`${r}-${c}`].title.toLowerCase() : null;
+    const capNote = CAPPED_TYPES.has(cat.type)
+      ? `<div class="modal-note">Searched among this actor's ~${MOVIE_LOOKUP_CAP} most popular films.</div>` : "";
+    const rows = films.map(f => {
+      const mine = yourTitle && f.title.toLowerCase() === yourTitle;
+      const pts = 50 + f.rarity;
+      return `<li class="${mine ? "mine" : ""}">${f.title} — ${pts} pts (${f.rarity} rarity, ${f.vote_count} votes)${mine ? " — your pick" : ""}</li>`;
+    }).join("");
+    setModalBody(`${capNote}<ul class="modal-list">${rows}</ul>`);
   } catch(err){
-    el("statusLine").textContent = err.message || "Couldn't reveal answers.";
-  } finally {
-    el("revealBtn").disabled = false;
+    setModalBody(`<div class="modal-status">${err.message || "Couldn't load matches."}</div>`);
   }
 }
 
-el("revealBtn").addEventListener("click", revealAllAnswers);
+async function openActorSeeAll(r){
+  const actorName = puzzle.actors[r];
+  openModal(`${actorName} — all films`, `<div class="modal-status">Loading filmography…</div>`);
+  try{
+    const profile = await getActorProfile(actorName);
+    if(!profile.credits.length){
+      setModalBody(`<div class="modal-status">No credits found.</div>`);
+      return;
+    }
+    const films = [...profile.credits].sort((a,b) => {
+      const ad = a.release_date || "0000-00-00";
+      const bd = b.release_date || "0000-00-00";
+      if(ad !== bd) return ad < bd ? 1 : -1; // year/date desc
+      return b.title.localeCompare(a.title); // title desc
+    });
+    const rows = films.map(f => {
+      const year = f.release_date ? f.release_date.slice(0,4) : "—";
+      return `<li>${f.title} (${year})</li>`;
+    }).join("");
+    setModalBody(`<ul class="modal-list">${rows}</ul>`);
+  } catch(err){
+    setModalBody(`<div class="modal-status">${err.message || "Couldn't load filmography."}</div>`);
+  }
+}
+
+function injectCellSeeAll(r, c){
+  const wrap = el(`seeAllWrap-${r}-${c}`);
+  if(!wrap || wrap.querySelector("button")) return;
+  const btn = document.createElement("button");
+  btn.className = "see-all-btn secondary";
+  btn.textContent = "See All";
+  btn.addEventListener("click", () => openCellSeeAll(r, c));
+  wrap.appendChild(btn);
+}
+
+function injectActorSeeAll(r){
+  const wrap = el(`seeAllActor-${r}`);
+  if(!wrap || wrap.querySelector("button")) return;
+  const btn = document.createElement("button");
+  btn.className = "see-all-btn secondary";
+  btn.textContent = "See All";
+  btn.addEventListener("click", () => openActorSeeAll(r));
+  wrap.appendChild(btn);
+}
+
+function enableSeeAll(){
+  if(!puzzle) return;
+  puzzle.actors.forEach((actor, r) => {
+    injectActorSeeAll(r);
+    puzzle.categories.forEach((cat, c) => injectCellSeeAll(r, c));
+  });
+  el("seeAllReadyBtn").disabled = true;
+  el("statusLine").textContent = "\"See All\" is ready on each actor and grid box — works whether or not you've answered that cell.";
+}
+
+el("seeAllReadyBtn").addEventListener("click", enableSeeAll);
 
 const MAX_ACTOR_ATTEMPTS = 6;   // re-sample the actor trio this many times if needed
 const MAX_CATEGORY_CANDIDATES = 60; // give up on this trio after trying this many categories
@@ -602,8 +710,9 @@ async function pickSolvablePuzzle(){
 }
 
 async function dealPuzzle(){
+  closeModal();
   el("newPuzzle").disabled = true;
-  el("revealBtn").disabled = true;
+  el("seeAllReadyBtn").disabled = true;
   el("statusLine").textContent = "Dealing...";
 
   let result;
@@ -633,7 +742,7 @@ async function dealPuzzle(){
   el("usedList").textContent = "";
   el("statusLine").textContent = "New puzzle dealt — every cell has been checked for a valid answer.";
   el("newPuzzle").disabled = false;
-  el("revealBtn").disabled = false;
+  el("seeAllReadyBtn").disabled = false;
 
   categories.forEach((c,i) => { el("cat"+i).textContent = c.label; });
 
@@ -642,20 +751,25 @@ async function dealPuzzle(){
   actors.forEach((actor, r) => {
     const tr = document.createElement("tr");
     const th = document.createElement("th");
-    th.textContent = actor;
+    th.innerHTML = `
+      <div class="actor-name">${actor}</div>
+      <div class="actor-seeall-wrap" id="seeAllActor-${r}"></div>
+    `;
     tr.appendChild(th);
     categories.forEach((cat, c) => {
       const td = document.createElement("td");
       td.className = "cell";
       td.id = `cell-${r}-${c}`;
       td.innerHTML = `
-        <div class="ac-wrap">
-          <input type="text" id="input-${r}-${c}" placeholder="Name a film..." autocomplete="off">
-          <ul class="ac-list" id="ac-${r}-${c}"></ul>
+        <div class="cell-inner" id="cellInner-${r}-${c}">
+          <div class="ac-wrap">
+            <input type="text" id="input-${r}-${c}" placeholder="Name a film..." autocomplete="off">
+            <ul class="ac-list" id="ac-${r}-${c}"></ul>
+          </div>
+          <button class="go" data-r="${r}" data-c="${c}">Submit</button>
+          <div class="fail-msg" id="fail-${r}-${c}"></div>
         </div>
-        <button class="go" data-r="${r}" data-c="${c}">Submit</button>
-        <div class="fail-msg" id="fail-${r}-${c}"></div>
-        <div class="reveal" id="reveal-${r}-${c}"></div>
+        <div class="see-all-wrap" id="seeAllWrap-${r}-${c}"></div>
       `;
       tr.appendChild(td);
     });
@@ -811,8 +925,8 @@ async function submitGuess(r, c){
     totalScore += points;
 
     const td = el(`cell-${r}-${c}`);
-    td.className = "cell correct";
-    td.innerHTML = `<div class="answer"><span class="movie-title">${details.title}</span>
+    td.classList.add("correct");
+    el(`cellInner-${r}-${c}`).innerHTML = `<div class="answer"><span class="movie-title">${details.title}</span>
       <span class="pts">+50 completeness, +${rarity} rarity (${details.vote_count} TMDb votes) — ${points} pts</span></div>`;
 
     el("totalScore").textContent = String(totalScore);

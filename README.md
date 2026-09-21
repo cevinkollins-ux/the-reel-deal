@@ -9,7 +9,9 @@ A single-file, browser-based practice version of [MovieGrid.io](https://moviegri
 - Click **Deal a new puzzle** to get 3 random actors and 3 random categories. Every actor × category cell is checked against real TMDb filmographies before the puzzle is shown, so you're never stuck on an impossible pairing (if a trio of actors can't yield 3 solvable categories, it re-samples a new trio automatically).
 - Type a film title into a cell — an autocomplete dropdown (powered by TMDb search) helps you pick the right one. Submit to check it.
 - Scoring per correct cell: 50 points for a valid answer + 1–50 rarity points on a log scale of the film's TMDb vote count (obscure picks score higher). Each film can only be used once per grid.
-- **Reveal best answers**: once a puzzle is dealt, click this to see every valid film for each of the 9 cells, sorted by rarity points, with your own pick (if any) marked — useful for checking whether you found the highest-scoring option.
+- **Ready to see answers**: once a puzzle is dealt, click this to reveal a **See All** button on each of the 9 grid boxes and on each of the 3 actors — whether or not you've already answered that cell.
+  - A grid box's **See All** pops up every valid film for that actor × category pairing, sorted by rarity points descending (title descending as a tiebreak), with your own pick marked if you made one — so you can check whether a higher-scoring answer existed.
+  - An actor's **See All** pops up that actor's entire filmography, sorted by release year descending (title descending as a tiebreak) — no category filter, just everything they're credited in.
 
 ## Categories
 
@@ -36,6 +38,6 @@ A deal picks 3 categories at random from the combined pool of all five types (co
 
 - Data comes from TMDb, not IMDb — TMDb has no direct IMDb review-count equivalent, so rarity is based on TMDb's own vote count.
 - The actor pool (~235 names, all with substantial film work from ~1990 to today) and category pool are hardcoded near the top of the `<script>` in `index.html` — edit the `ACTORS`, `DIRECTORS`, and `COLLECTIONS` arrays to tune who/what shows up.
-- Director/collection solvability checks and the "Reveal best answers" feature only look at each actor's ~20 most popular films, not their full filmography — an obscure director credit outside that window won't be suggested or counted toward solvability, even though typing it in yourself would still score.
+- Director/collection solvability checks and a grid box's "See All" only look at each actor's ~20 most popular films, not their full filmography — an obscure director credit outside that window won't be suggested or counted toward solvability, even though typing it in yourself would still score. (An actor's own "See All" isn't affected by this — it lists their complete filmography.)
 - Franchise/collection matching is a loose string match against TMDb's `belongs_to_collection` field and can occasionally miss films TMDb doesn't tag into a collection.
 - No award-based categories (e.g. Oscar nominations) since TMDb doesn't track those — would need a separate static dataset to add them.
