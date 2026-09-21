@@ -200,6 +200,7 @@
   .sandbox-cat select + select{margin-top:4px;}
   .sandbox-hint{font-size:0.78rem;color:#8a8265;font-style:italic;}
   .sandbox-count{font-size:0.88rem;font-weight:700;margin-bottom:6px;}
+  .sandbox-count.zero{color:var(--wrong);}
   .modal-overlay{
     display:none;
     position:fixed;
@@ -243,10 +244,13 @@
   }
   .modal-status{color:#5a5240;font-style:italic;}
   .modal-note{color:#8a8265;font-size:0.75rem;margin-bottom:8px;}
+  .modal-note code{background:#e4dcc7;padding:1px 4px;}
   .modal-list{list-style:none;margin:0;padding:0;}
   .modal-list li{padding:4px 0;border-bottom:1px solid #ece5d3;}
   .modal-list li:last-child{border-bottom:none;}
   .modal-list li.mine{font-weight:700;color:var(--brass);}
+  .modal-list li.copyable{cursor:pointer;}
+  .modal-list li.copyable:hover{background:#efe4c8;}
   footer{
     margin-top:30px;
     font-size:0.75rem;
@@ -412,6 +416,7 @@ let cellAnswers = {}; // "r-c" -> {title, id, points}
 let usedMovieIds = new Set();
 let totalScore = 0;
 let sandboxMode = false;
+let sandboxCellCounts = {}; // "r-c" -> valid-answer count, kept in sync by refreshSandboxCell
 
 const el = id => document.getElementById(id);
 
@@ -635,6 +640,57 @@ document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal();
 
 const CAPPED_TYPES = new Set(["director", "collection"]);
 
+// ---------- Sandbox-only: copy a snippet identifying a person/film for inspect_tmdb.py ----------
+// The exact TMDb data our filtering logic (isRealFeatureCredit, category matching) reads is only
+// visible in the raw API response — this hands the IDs needed to fetch it straight to a companion
+// Python script, without exposing an API key anywhere in the page.
+
+function buildApiSnippet(personId, personName, movieId, movieTitle){
+  let s = `person_id=${personId}&person_name=${encodeURIComponent(personName)}`;
+  if(movieId != null) s += `&movie_id=${movieId}&movie_title=${encodeURIComponent(movieTitle)}`;
+  return s;
+}
+
+function copyToClipboard(text){
+  const report = ok => {
+    el("statusLine").textContent = ok
+      ? "API call snippet copied to clipboard — paste it into inspect_tmdb.py."
+      : `Couldn't copy automatically. Copy this manually: ${text}`;
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(() => report(true)).catch(() => report(fallbackCopy(text)));
+  } else {
+    report(fallbackCopy(text));
+  }
+}
+
+function fallbackCopy(text){
+  try{
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch(err){
+    return false;
+  }
+}
+
+function wireSandboxCopyableTitles(personId, personName){
+  if(!sandboxMode) return;
+  el("modalBody").querySelectorAll("li[data-movie-id]").forEach(li => {
+    li.classList.add("copyable");
+    li.addEventListener("click", () => {
+      copyToClipboard(buildApiSnippet(personId, personName, li.dataset.movieId, li.dataset.movieTitle));
+    });
+  });
+}
+
 async function openCellSeeAll(r, c){
   const actorName = puzzle.actors[r];
   const cat = puzzle.categories[c];
@@ -649,12 +705,14 @@ async function openCellSeeAll(r, c){
     const yourTitle = cellAnswers[`${r}-${c}`] ? cellAnswers[`${r}-${c}`].title.toLowerCase() : null;
     const capNote = CAPPED_TYPES.has(cat.type)
       ? `<div class="modal-note">Searched among this actor's ~${MOVIE_LOOKUP_CAP} most popular films.</div>` : "";
+    const sandboxNote = sandboxMode ? `<div class="modal-note">Click a title to copy an API-call snippet for <code>inspect_tmdb.py</code>.</div>` : "";
     const rows = films.map(f => {
       const mine = yourTitle && f.title.toLowerCase() === yourTitle;
       const pts = 50 + f.rarity;
-      return `<li class="${mine ? "mine" : ""}">${f.title} — ${pts} pts (${f.rarity} rarity, ${f.vote_count} votes)${mine ? " — your pick" : ""}</li>`;
+      return `<li class="${mine ? "mine" : ""}" data-movie-id="${f.id}" data-movie-title="${f.title.replace(/"/g,"&quot;")}">${f.title} — ${pts} pts (${f.rarity} rarity, ${f.vote_count} votes)${mine ? " — your pick" : ""}</li>`;
     }).join("");
-    setModalBody(`${capNote}<ul class="modal-list">${rows}</ul>`);
+    setModalBody(`${capNote}${sandboxNote}<ul class="modal-list">${rows}</ul>`);
+    wireSandboxCopyableTitles(profile.id, actorName);
   } catch(err){
     setModalBody(`<div class="modal-status">${err.message || "Couldn't load matches."}</div>`);
   }
@@ -675,11 +733,13 @@ async function openActorSeeAll(r){
       if(ad !== bd) return ad < bd ? 1 : -1; // year/date desc
       return b.title.localeCompare(a.title); // title desc
     });
+    const sandboxNote = sandboxMode ? `<div class="modal-note">Click a title to copy an API-call snippet for <code>inspect_tmdb.py</code>.</div>` : "";
     const rows = films.map(f => {
       const year = f.release_date ? f.release_date.slice(0,4) : "—";
-      return `<li>${f.title} (${year})</li>`;
+      return `<li data-movie-id="${f.id}" data-movie-title="${f.title.replace(/"/g,"&quot;")}">${f.title} (${year})</li>`;
     }).join("");
-    setModalBody(`<ul class="modal-list">${rows}</ul>`);
+    setModalBody(`${sandboxNote}<ul class="modal-list">${rows}</ul>`);
+    wireSandboxCopyableTitles(profile.id, actorName);
   } catch(err){
     setModalBody(`<div class="modal-status">${err.message || "Couldn't load filmography."}</div>`);
   }
@@ -862,13 +922,16 @@ function renderPlayableGrid(actors, categories){
 el("sandboxToggle").addEventListener("change", onSandboxToggle);
 el("fillInGridBtn").addEventListener("click", fillInGrid);
 
-function onSandboxToggle(e){
+async function onSandboxToggle(e){
   if(e.target.checked){
     const proceed = confirm("Enabling Sandbox mode clears the current grid so you can build your own actor/category combinations. Continue?");
     if(!proceed){ e.target.checked = false; return; }
     enterSandboxMode();
   } else {
-    if(!exitSandboxMode()) e.target.checked = true;
+    e.target.disabled = true;
+    const left = await exitSandboxMode();
+    e.target.disabled = false;
+    if(!left) e.target.checked = true;
   }
 }
 
@@ -879,6 +942,7 @@ function enterSandboxMode(){
   cellAnswers = {};
   usedMovieIds = new Set();
   totalScore = 0;
+  sandboxCellCounts = {};
 
   el("game").style.display = "block";
   el("scoreboard").style.display = "none";
@@ -890,11 +954,34 @@ function enterSandboxMode(){
   renderSandboxGrid();
 }
 
-function exitSandboxMode(){
+async function exitSandboxMode(){
   if(puzzle.actors.some(a => !a) || puzzle.categories.some(c => !c)){
     el("statusLine").textContent = "Set all 3 actors and 3 categories first — or click \"Fill in grid\" — before leaving Sandbox mode.";
     return false;
   }
+
+  el("statusLine").textContent = "Double-checking every cell has a valid answer...";
+  await refreshAllSandboxCells(); // cache-backed, so this is fast — makes sure counts are current
+
+  const zeroCells = [];
+  for(let r=0; r<3; r++){
+    for(let c=0; c<3; c++){
+      if(sandboxCellCounts[`${r}-${c}`] === 0){
+        zeroCells.push(`${puzzle.actors[r]} × ${puzzle.categories[c].label}`);
+      }
+    }
+  }
+  if(zeroCells.length){
+    const proceed = confirm(
+      `Heads up: ${zeroCells.length} cell(s) have no valid answers:\n\n${zeroCells.join("\n")}\n\n` +
+      `You can still play, but at least one cell won't be solvable. Continue anyway?`
+    );
+    if(!proceed){
+      el("statusLine").textContent = "Stayed in Sandbox mode — adjust the flagged cell(s), or click \"Fill in grid\" again.";
+      return false;
+    }
+  }
+
   sandboxMode = false;
   closeModal();
   cellAnswers = {};
@@ -945,7 +1032,10 @@ function renderSandboxGrid(){
   for(let r=0; r<3; r++){
     const tr = document.createElement("tr");
     const th = document.createElement("th");
-    th.innerHTML = `<select class="actor-select" id="actorSelect-${r}"><option value="">Actor…</option>${actorOptionsHtml()}</select>`;
+    th.innerHTML = `
+      <select class="actor-select" id="actorSelect-${r}"><option value="">Actor…</option>${actorOptionsHtml()}</select>
+      <button class="see-all-btn secondary" id="copyActorApi-${r}" style="display:none;margin-top:4px;">Copy API call</button>
+    `;
     tr.appendChild(th);
     for(let c=0; c<3; c++){
       const td = document.createElement("td");
@@ -969,6 +1059,17 @@ function onSandboxActorChange(r){
     puzzle.actors[r] = null;
   } else {
     puzzle.actors[r] = name;
+  }
+
+  const copyBtn = el(`copyActorApi-${r}`);
+  if(puzzle.actors[r]){
+    copyBtn.style.display = "inline-block";
+    copyBtn.onclick = async () => {
+      const profile = await getActorProfile(puzzle.actors[r]);
+      copyToClipboard(buildApiSnippet(profile.id, puzzle.actors[r]));
+    };
+  } else {
+    copyBtn.style.display = "none";
   }
   refreshSandboxRow(r);
 }
@@ -1034,7 +1135,9 @@ async function refreshSandboxCell(r, c){
   if(!cellEl) return;
   const actor = puzzle.actors[r];
   const cat = puzzle.categories[c];
+  const key = `${r}-${c}`;
   if(!actor || !cat){
+    delete sandboxCellCounts[key];
     cellEl.innerHTML = `<div class="sandbox-hint">Set both actor &amp; category</div>`;
     return;
   }
@@ -1042,13 +1145,15 @@ async function refreshSandboxCell(r, c){
   try{
     const profile = await getActorProfile(actor);
     const films = await getValidFilms(profile, cat);
-    cellEl.innerHTML = `<div class="sandbox-count">${films.length} valid answer${films.length === 1 ? "" : "s"}</div>`;
+    sandboxCellCounts[key] = films.length;
+    cellEl.innerHTML = `<div class="sandbox-count${films.length === 0 ? " zero" : ""}">${films.length} valid answer${films.length === 1 ? "" : "s"}</div>`;
     const btn = document.createElement("button");
     btn.className = "see-all-btn secondary";
     btn.textContent = "See All";
     btn.addEventListener("click", () => openCellSeeAll(r, c));
     cellEl.appendChild(btn);
   } catch(err){
+    delete sandboxCellCounts[key];
     cellEl.innerHTML = `<div class="sandbox-hint">${err.message || "Couldn't check this pairing."}</div>`;
   }
 }

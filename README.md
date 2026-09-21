@@ -20,8 +20,20 @@ Check **Sandbox mode** (next to Deal a new puzzle) to build a grid by hand inste
 - Checking it asks for confirmation (it clears whatever grid is currently up), then replaces the grid with pickers: a dropdown per row to choose an actor, and a category-type + category-value dropdown pair per column.
 - As soon as both a row's actor and a column's category are set, that cell shows a live count of valid answers plus a **See All** button — the same popup used in normal play — so you can see immediately whether a pairing is trivial, impossible, or interesting before committing to it.
 - **Fill in grid** randomly completes whatever actors/categories you haven't set yet, trying to keep the result solvable against anything you *did* set by hand. It never touches or second-guesses your manual picks, even ones with few or zero valid answers — Sandbox mode is meant for exploring those too.
-- Unchecking Sandbox mode converts the current grid into a normal playable one (same actors/categories, fresh score) — but only once all 3 actors and 3 categories are set; otherwise it tells you to finish (or click Fill in grid) first.
+- Unchecking Sandbox mode converts the current grid into a normal playable one (same actors/categories, fresh score) — but only once all 3 actors and 3 categories are set; otherwise it tells you to finish (or click Fill in grid) first. If every cell is set but at least one has 0 valid answers, you get a warning listing which cell(s) — you can still proceed, you'll just know going in that at least one box isn't solvable.
 - Actor and category values are drawn from the same curated pools used for random dealing (`ACTOR_POOL`, `GENRES`, `DECADES`, `DIRECTORS`, `COLLECTIONS`) via dropdowns, rather than free-text TMDb search — simpler and more robust, at the cost of not being able to hand-pick an actor or director outside those lists.
+
+### Inspecting the raw TMDb data (`inspect_tmdb.py`)
+
+Sandbox mode also gives you a way to see exactly what TMDb returns for an actor (or a specific actor + film), for cases like the "Blade Runner 2049: Behind the Scenes" one — no API key ever touches this app's own network calls from a debugging tool, and Claude never handles your key either.
+
+1. In Sandbox mode, click **Copy API call** next to an actor (for their whole filmography), or click any film title inside a **See All** popup (for that specific actor + film) — the status line confirms it copied.
+2. Paste the copied snippet into `api_call_to_review` at the top of [`inspect_tmdb.py`](inspect_tmdb.py), replacing whatever is there.
+3. Run `python3 inspect_tmdb.py`.
+
+It fetches `/person/{id}/movie_credits` (and `/movie/{id}` too, if a film was included), prints the fields relevant to this app's filtering (`vote_count`, `video`, `genre_ids`, `popularity`, director, collection, etc.), and saves the full raw JSON under `tmdb_inspect_output/` for a closer look.
+
+The script needs its own TMDb API key (separate from the one in the browser page) — same free key works fine. It checks, in order: a `TMDB_API_KEY` environment variable, a `tmdb_api_key.txt` file next to the script (gitignored), or it'll just prompt you at runtime.
 
 ## Categories
 
@@ -55,4 +67,4 @@ A deal picks 3 categories at random from the combined pool of all five types (co
 
 ## Open issues / to revisit
 
-- **The vote-count filter (`MIN_VOTE_COUNT = 1`) is a heuristic, not a guarantee.** It's plausible a popular "behind the scenes" or "making of" special picks up enough TMDb votes to slip past the filter and the title-pattern denylist (e.g. one not phrased like the usual "X: Behind the Scenes" pattern). If a junk non-feature title turns up again as a valid answer, the next step is inspecting the *raw* TMDb `/person/{id}/movie_credits` response for that actor to see what actually distinguishes real features from bonus content in the fields TMDb returns (e.g. `video`, `genre_ids`, `popularity` — not yet explored) — Claude's sandbox can reach the TMDb API directly, but doesn't hold a key, so this needs either the user running a `curl` command and pasting back the JSON, or a screenshot/copy of a specific offending entry from a See All popup (which already exposes title + vote count, as it did for the Blade Runner 2049 case).
+- **The vote-count filter (`MIN_VOTE_COUNT = 1`) is a heuristic, not a guarantee.** It's plausible a popular "behind the scenes" or "making of" special picks up enough TMDb votes to slip past the filter and the title-pattern denylist (e.g. one not phrased like the usual "X: Behind the Scenes" pattern). If a junk non-feature title turns up again as a valid answer, use `inspect_tmdb.py` (see above) on that actor/film to see the raw TMDb fields (`video`, `genre_ids`, `popularity`, etc.) and figure out a better rule.

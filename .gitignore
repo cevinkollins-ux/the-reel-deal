@@ -1,1 +1,4 @@
 .DS_Store
+tmdb_api_key.txt
+tmdb_inspect_output/
+__pycache__/
