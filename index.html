@@ -436,6 +436,20 @@ async function ensureGenreMap(){
   return genreNameToId;
 }
 
+// TMDb's "movie" catalog includes non-feature entries (making-of featurettes,
+// behind-the-scenes shorts, bonus clips) credited alongside real films. These
+// almost always have zero TMDb votes, which our rarity formula treats as
+// *maximum* rarity — so without filtering, junk like "Blade Runner 2049:
+// Behind the Scenes" would outscore the real movie. isRealFeatureCredit()
+// is the single gate used everywhere a film is considered valid: profile
+// fetching, autocomplete suggestions, and the actual submit check.
+const MIN_VOTE_COUNT = 1;
+const NON_FEATURE_TITLE_PATTERN = /\b(behind[\s-]the[\s-]scenes|making[\s-]of|gag reel|bloopers|deleted scenes|bonus (features?|footage|clip)|featurette|extended (trailer|preview)|red[\s-]band trailer|teaser trailer|first look|table read)\b/i;
+
+function isRealFeatureCredit(title, voteCount){
+  return (voteCount || 0) >= MIN_VOTE_COUNT && !NON_FEATURE_TITLE_PATTERN.test(title || "");
+}
+
 const personCache = new Map(); // name(lower) -> {id, credits}
 async function getActorProfile(name){
   const key = name.toLowerCase();
@@ -448,6 +462,7 @@ async function getActorProfile(name){
   }
   const data = await tmdb(`/person/${id}/movie_credits`);
   const credits = (data.cast || [])
+    .filter(m => isRealFeatureCredit(m.title, m.vote_count))
     .map(m => ({
       id:m.id, title:m.title, genre_ids:m.genre_ids || [],
       release_date:m.release_date, popularity:m.popularity || 0, vote_count:m.vote_count || 0
@@ -818,12 +833,13 @@ async function doAutocomplete(r, c, query){
   const list = el(`ac-${r}-${c}`);
   try{
     const data = await tmdb("/search/movie", {query});
-    if(!data.results || !data.results.length){
+    const filtered = (data.results || []).filter(m => isRealFeatureCredit(m.title, m.vote_count));
+    if(!filtered.length){
       list.style.display = "none";
       list.innerHTML = "";
       return;
     }
-    const top = data.results.slice(0, 8);
+    const top = filtered.slice(0, 8);
     const counts = {};
     top.forEach(m => {
       const t = m.title.toLowerCase();
@@ -888,6 +904,11 @@ async function submitGuess(r, c){
       return;
     }
     const details = await tmdb(`/movie/${movieId}`, {append_to_response:"credits"});
+
+    if(!isRealFeatureCredit(details.title, details.vote_count)){
+      failEl.textContent = `"${details.title}" doesn't look like a real feature film on TMDb (no votes / bonus content) — try another title.`;
+      return;
+    }
 
     const castNames = (details.credits.cast || []).map(p => p.name.toLowerCase());
     if(!castNames.includes(actorName.toLowerCase())){
