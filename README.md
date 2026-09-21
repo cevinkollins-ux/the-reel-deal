@@ -13,6 +13,16 @@ A single-file, browser-based practice version of [MovieGrid.io](https://moviegri
   - A grid box's **See All** pops up every valid film for that actor × category pairing, sorted by rarity points descending (title descending as a tiebreak), with your own pick marked if you made one — so you can check whether a higher-scoring answer existed.
   - An actor's **See All** pops up that actor's entire filmography, sorted by release year descending (title descending as a tiebreak) — no category filter, just everything they're credited in.
 
+## Sandbox mode
+
+Check **Sandbox mode** (next to Deal a new puzzle) to build a grid by hand instead of dealing one randomly — useful for testing specific actor/category combinations or setting up a puzzle for someone else to play.
+
+- Checking it asks for confirmation (it clears whatever grid is currently up), then replaces the grid with pickers: a dropdown per row to choose an actor, and a category-type + category-value dropdown pair per column.
+- As soon as both a row's actor and a column's category are set, that cell shows a live count of valid answers plus a **See All** button — the same popup used in normal play — so you can see immediately whether a pairing is trivial, impossible, or interesting before committing to it.
+- **Fill in grid** randomly completes whatever actors/categories you haven't set yet, trying to keep the result solvable against anything you *did* set by hand. It never touches or second-guesses your manual picks, even ones with few or zero valid answers — Sandbox mode is meant for exploring those too.
+- Unchecking Sandbox mode converts the current grid into a normal playable one (same actors/categories, fresh score) — but only once all 3 actors and 3 categories are set; otherwise it tells you to finish (or click Fill in grid) first.
+- Actor and category values are drawn from the same curated pools used for random dealing (`ACTOR_POOL`, `GENRES`, `DECADES`, `DIRECTORS`, `COLLECTIONS`) via dropdowns, rather than free-text TMDb search — simpler and more robust, at the cost of not being able to hand-pick an actor or director outside those lists.
+
 ## Categories
 
 Every category comes from one of five fixed types, defined near the top of the `<script>` in `index.html`:
@@ -42,3 +52,7 @@ A deal picks 3 categories at random from the combined pool of all five types (co
 - Director/collection solvability checks and a grid box's "See All" only look at each actor's ~20 most popular films, not their full filmography — an obscure director credit outside that window won't be suggested or counted toward solvability, even though typing it in yourself would still score. (An actor's own "See All" isn't affected by this — it lists their complete filmography.)
 - Franchise/collection matching is a loose string match against TMDb's `belongs_to_collection` field and can occasionally miss films TMDb doesn't tag into a collection.
 - No award-based categories (e.g. Oscar nominations) since TMDb doesn't track those — would need a separate static dataset to add them.
+
+## Open issues / to revisit
+
+- **The vote-count filter (`MIN_VOTE_COUNT = 1`) is a heuristic, not a guarantee.** It's plausible a popular "behind the scenes" or "making of" special picks up enough TMDb votes to slip past the filter and the title-pattern denylist (e.g. one not phrased like the usual "X: Behind the Scenes" pattern). If a junk non-feature title turns up again as a valid answer, the next step is inspecting the *raw* TMDb `/person/{id}/movie_credits` response for that actor to see what actually distinguishes real features from bonus content in the fields TMDb returns (e.g. `video`, `genre_ids`, `popularity` — not yet explored) — Claude's sandbox can reach the TMDb API directly, but doesn't hold a key, so this needs either the user running a `curl` command and pasting back the JSON, or a screenshot/copy of a specific offending entry from a See All popup (which already exposes title + vote count, as it did for the Blade Runner 2049 case).

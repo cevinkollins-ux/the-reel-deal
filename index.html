@@ -84,6 +84,15 @@
   button.secondary:hover{background:rgba(0,0,0,0.06);}
   button:disabled{opacity:0.4;cursor:not-allowed;}
   .status-line{font-size:0.85rem;color:#5a5240;margin-top:8px;min-height:1.2em;}
+  .sandbox-toggle{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:0.85rem;
+    color:#5a5240;
+    cursor:pointer;
+  }
+  .sandbox-toggle input{cursor:pointer;}
 
   .scoreboard{
     display:flex;
@@ -180,6 +189,17 @@
     padding:3px 9px;
   }
   .see-all-wrap{margin-top:6px;}
+  .actor-select, .sandbox-cat select{
+    font-family:inherit;
+    font-size:0.8rem;
+    padding:4px 6px;
+    border:1px solid var(--ledger-line);
+    background:#fff;
+    width:100%;
+  }
+  .sandbox-cat select + select{margin-top:4px;}
+  .sandbox-hint{font-size:0.78rem;color:#8a8265;font-style:italic;}
+  .sandbox-count{font-size:0.88rem;font-weight:700;margin-bottom:6px;}
   .modal-overlay{
     display:none;
     position:fixed;
@@ -252,15 +272,20 @@
       <input type="password" id="apiKey" placeholder="Paste your TMDb API key">
       <button id="saveKey">Save key</button>
       <button id="newPuzzle" class="secondary" disabled>Deal a new puzzle</button>
+      <label class="sandbox-toggle"><input type="checkbox" id="sandboxToggle" disabled> Sandbox mode</label>
     </div>
     <div class="status-line" id="statusLine">Get a free key at themoviedb.org → Settings → API, then paste it above.</div>
   </div>
 
   <div id="game" style="display:none;">
-    <div class="scoreboard">
+    <div class="scoreboard" id="scoreboard">
       <div><span class="total" id="totalScore">0</span> <span class="label">pts</span></div>
       <div class="label" id="filledCount">0 / 9 filled</div>
       <button id="seeAllReadyBtn" class="secondary" disabled>Ready to see answers</button>
+    </div>
+    <div class="scoreboard" id="sandboxBar" style="display:none;">
+      <div class="label">Sandbox mode — set actors &amp; categories below, or click "Fill in grid" to finish automatically.</div>
+      <button id="fillInGridBtn" class="secondary">Fill in grid</button>
     </div>
     <table class="grid">
       <thead>
@@ -386,6 +411,7 @@ let puzzle = null; // {actors:[3], categories:[3]}
 let cellAnswers = {}; // "r-c" -> {title, id, points}
 let usedMovieIds = new Set();
 let totalScore = 0;
+let sandboxMode = false;
 
 const el = id => document.getElementById(id);
 
@@ -393,6 +419,7 @@ el("apiKey").value = apiKey;
 if(apiKey){
   el("statusLine").textContent = "Key loaded from this browser. Ready to deal a puzzle.";
   el("newPuzzle").disabled = false;
+  el("sandboxToggle").disabled = false;
 }
 
 el("saveKey").addEventListener("click", () => {
@@ -401,6 +428,7 @@ el("saveKey").addEventListener("click", () => {
   localStorage.setItem("tmdb_key", apiKey);
   el("statusLine").textContent = "Key saved. Ready to deal a puzzle.";
   el("newPuzzle").disabled = false;
+  el("sandboxToggle").disabled = false;
 });
 
 el("newPuzzle").addEventListener("click", dealPuzzle);
@@ -752,6 +780,8 @@ async function dealPuzzle(){
   totalScore = 0;
 
   el("game").style.display = "block";
+  el("scoreboard").style.display = "flex";
+  el("sandboxBar").style.display = "none";
   el("totalScore").textContent = "0";
   el("filledCount").textContent = "0 / 9 filled";
   el("usedList").textContent = "";
@@ -759,6 +789,12 @@ async function dealPuzzle(){
   el("newPuzzle").disabled = false;
   el("seeAllReadyBtn").disabled = false;
 
+  renderPlayableGrid(actors, categories);
+}
+
+// Builds the normal "type an answer and Submit" grid — used both by dealPuzzle()
+// and when leaving Sandbox mode with a hand-built actor/category trio.
+function renderPlayableGrid(actors, categories){
   categories.forEach((c,i) => { el("cat"+i).textContent = c.label; });
 
   const body = el("gridBody");
@@ -819,6 +855,273 @@ async function dealPuzzle(){
       setTimeout(() => { list.style.display = "none"; }, 150);
     });
   });
+}
+
+// ---------- Sandbox mode: hand-build a grid, previewing answer counts per cell ----------
+
+el("sandboxToggle").addEventListener("change", onSandboxToggle);
+el("fillInGridBtn").addEventListener("click", fillInGrid);
+
+function onSandboxToggle(e){
+  if(e.target.checked){
+    const proceed = confirm("Enabling Sandbox mode clears the current grid so you can build your own actor/category combinations. Continue?");
+    if(!proceed){ e.target.checked = false; return; }
+    enterSandboxMode();
+  } else {
+    if(!exitSandboxMode()) e.target.checked = true;
+  }
+}
+
+function enterSandboxMode(){
+  sandboxMode = true;
+  closeModal();
+  puzzle = {actors:[null,null,null], categories:[null,null,null]};
+  cellAnswers = {};
+  usedMovieIds = new Set();
+  totalScore = 0;
+
+  el("game").style.display = "block";
+  el("scoreboard").style.display = "none";
+  el("sandboxBar").style.display = "flex";
+  el("newPuzzle").disabled = true;
+  el("usedList").textContent = "";
+  el("statusLine").textContent = "Sandbox mode — pick an actor for each row and a category for each column.";
+
+  renderSandboxGrid();
+}
+
+function exitSandboxMode(){
+  if(puzzle.actors.some(a => !a) || puzzle.categories.some(c => !c)){
+    el("statusLine").textContent = "Set all 3 actors and 3 categories first — or click \"Fill in grid\" — before leaving Sandbox mode.";
+    return false;
+  }
+  sandboxMode = false;
+  closeModal();
+  cellAnswers = {};
+  usedMovieIds = new Set();
+  totalScore = 0;
+
+  el("scoreboard").style.display = "flex";
+  el("sandboxBar").style.display = "none";
+  el("newPuzzle").disabled = false;
+  el("seeAllReadyBtn").disabled = false;
+  el("totalScore").textContent = "0";
+  el("filledCount").textContent = "0 / 9 filled";
+  el("usedList").textContent = "";
+  el("statusLine").textContent = "Your sandbox grid is ready to play — good luck!";
+
+  renderPlayableGrid(puzzle.actors, puzzle.categories);
+  return true;
+}
+
+function actorOptionsHtml(){
+  return [...ACTOR_POOL].sort().map(a => `<option value="${a}">${a}</option>`).join("");
+}
+
+const CATEGORY_TYPE_OPTIONS = [
+  {value:"genre", label:"Genre"},
+  {value:"decade", label:"Decade"},
+  {value:"director", label:"Director"},
+  {value:"collection", label:"Franchise / collection"},
+  {value:"costar", label:"Co-star"}
+];
+
+function renderSandboxGrid(){
+  for(let c=0; c<3; c++){
+    el("cat"+c).innerHTML = `
+      <div class="sandbox-cat">
+        <select id="catType-${c}">
+          <option value="">Category type…</option>
+          ${CATEGORY_TYPE_OPTIONS.map(o => `<option value="${o.value}">${o.label}</option>`).join("")}
+        </select>
+        <select id="catValue-${c}" style="display:none;"></select>
+      </div>
+    `;
+    el(`catType-${c}`).addEventListener("change", () => onSandboxCatTypeChange(c));
+  }
+
+  const body = el("gridBody");
+  body.innerHTML = "";
+  for(let r=0; r<3; r++){
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.innerHTML = `<select class="actor-select" id="actorSelect-${r}"><option value="">Actor…</option>${actorOptionsHtml()}</select>`;
+    tr.appendChild(th);
+    for(let c=0; c<3; c++){
+      const td = document.createElement("td");
+      td.className = "cell";
+      td.id = `sandboxCell-${r}-${c}`;
+      td.innerHTML = `<div class="sandbox-hint">Set both actor &amp; category</div>`;
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+  for(let r=0; r<3; r++){
+    el(`actorSelect-${r}`).addEventListener("change", () => onSandboxActorChange(r));
+  }
+}
+
+function onSandboxActorChange(r){
+  const name = el(`actorSelect-${r}`).value || null;
+  if(name && puzzle.actors.some((existing, idx) => idx !== r && existing === name)){
+    el("statusLine").textContent = `${name} is already used in another row — pick a different actor.`;
+    el(`actorSelect-${r}`).value = "";
+    puzzle.actors[r] = null;
+  } else {
+    puzzle.actors[r] = name;
+  }
+  refreshSandboxRow(r);
+}
+
+function categoryFromTypeAndRaw(type, raw){
+  if(type === "genre") return {type, label:raw, value:raw};
+  if(type === "decade") return {type, label:`Released in the ${raw}s`, value:parseInt(raw)};
+  if(type === "director") return {type, label:`Directed by ${raw}`, value:raw};
+  if(type === "collection") return {type, label:raw, value:raw};
+  if(type === "costar") return {type, label:`Co-starred with ${raw}`, value:raw};
+  return null;
+}
+
+function onSandboxCatTypeChange(c){
+  const type = el(`catType-${c}`).value;
+  const valueSelect = el(`catValue-${c}`);
+  puzzle.categories[c] = null;
+
+  if(!type){
+    valueSelect.style.display = "none";
+    valueSelect.innerHTML = "";
+    refreshSandboxColumn(c);
+    return;
+  }
+
+  let options = [];
+  if(type === "genre") options = GENRES.map(g => ({value:g, label:g}));
+  else if(type === "decade") options = DECADES.map(d => ({value:String(d), label:`${d}s`}));
+  else if(type === "director") options = DIRECTORS.map(d => ({value:d, label:d}));
+  else if(type === "collection") options = COLLECTIONS.map(cName => ({value:cName, label:cName}));
+  else if(type === "costar") options = [...ACTOR_POOL].sort().map(a => ({value:a, label:a}));
+
+  valueSelect.innerHTML = `<option value="">Choose…</option>` + options.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
+  valueSelect.style.display = "inline-block";
+  valueSelect.onchange = () => onSandboxCatValueChange(c, type);
+  refreshSandboxColumn(c);
+}
+
+function onSandboxCatValueChange(c, type){
+  const raw = el(`catValue-${c}`).value;
+  if(!raw){ puzzle.categories[c] = null; refreshSandboxColumn(c); return; }
+
+  const cat = categoryFromTypeAndRaw(type, raw);
+  const dup = puzzle.categories.some((existing, idx) => idx !== c && existing && existing.type === cat.type && existing.value === cat.value);
+  if(dup){
+    el("statusLine").textContent = "That category is already used in another column — pick a different one.";
+    el(`catValue-${c}`).value = "";
+    puzzle.categories[c] = null;
+    return;
+  }
+  puzzle.categories[c] = cat;
+  refreshSandboxColumn(c);
+}
+
+function refreshSandboxRow(r){ for(let c=0; c<3; c++) refreshSandboxCell(r, c); }
+function refreshSandboxColumn(c){ for(let r=0; r<3; r++) refreshSandboxCell(r, c); }
+async function refreshAllSandboxCells(){
+  for(let r=0; r<3; r++){ for(let c=0; c<3; c++){ await refreshSandboxCell(r, c); } }
+}
+
+async function refreshSandboxCell(r, c){
+  const cellEl = el(`sandboxCell-${r}-${c}`);
+  if(!cellEl) return;
+  const actor = puzzle.actors[r];
+  const cat = puzzle.categories[c];
+  if(!actor || !cat){
+    cellEl.innerHTML = `<div class="sandbox-hint">Set both actor &amp; category</div>`;
+    return;
+  }
+  cellEl.innerHTML = `<div class="sandbox-hint">Checking…</div>`;
+  try{
+    const profile = await getActorProfile(actor);
+    const films = await getValidFilms(profile, cat);
+    cellEl.innerHTML = `<div class="sandbox-count">${films.length} valid answer${films.length === 1 ? "" : "s"}</div>`;
+    const btn = document.createElement("button");
+    btn.className = "see-all-btn secondary";
+    btn.textContent = "See All";
+    btn.addEventListener("click", () => openCellSeeAll(r, c));
+    cellEl.appendChild(btn);
+  } catch(err){
+    cellEl.innerHTML = `<div class="sandbox-hint">${err.message || "Couldn't check this pairing."}</div>`;
+  }
+}
+
+// Randomly fills any actor/category slot the user left blank, trying to keep
+// the result solvable against whatever the user already set by hand. Slots
+// the user filled in themselves are never overwritten or second-guessed —
+// Sandbox mode is explicitly for exploring combinations, "bad" ones included.
+async function fillInGrid(){
+  el("fillInGridBtn").disabled = true;
+  el("sandboxToggle").disabled = true;
+  el("statusLine").textContent = "Filling in the rest of the grid...";
+  try{
+    await ensureGenreMap();
+
+    for(let r=0; r<3; r++){
+      if(puzzle.actors[r]) continue;
+      const excluded = puzzle.actors.filter(Boolean);
+      const candidates = sample(ACTOR_POOL.filter(a => !excluded.includes(a)), ACTOR_POOL.length);
+      const setCats = puzzle.categories.filter(Boolean);
+      let chosen = null;
+      for(const candidate of candidates){
+        const profile = await getActorProfile(candidate);
+        if(!profile.id || !profile.credits.length) continue;
+        let ok = true;
+        for(const cat of setCats){
+          if(!(await categoryValidForAll(cat, [profile]))){ ok = false; break; }
+        }
+        if(ok){ chosen = candidate; break; }
+      }
+      puzzle.actors[r] = chosen || candidates[0];
+      el(`actorSelect-${r}`).value = puzzle.actors[r];
+    }
+
+    if(puzzle.categories.some(c => !c)){
+      const actorProfiles = [];
+      for(const name of puzzle.actors) actorProfiles.push(await getActorProfile(name));
+      const excludedCats = puzzle.categories.filter(Boolean);
+      const pool = buildCategoryPool(puzzle.actors).filter(cand =>
+        !excludedCats.some(x => x.type === cand.type && x.value === cand.value)
+      );
+      const shuffled = sample(pool, pool.length);
+      let idx = 0;
+
+      for(let c=0; c<3; c++){
+        if(puzzle.categories[c]) continue;
+        let chosen = null;
+        while(idx < shuffled.length){
+          const cand = shuffled[idx++];
+          const dup = puzzle.categories.some(x => x && x.type === cand.type && x.value === cand.value);
+          if(dup) continue;
+          if(await categoryValidForAll(cand, actorProfiles)){ chosen = cand; break; }
+        }
+        puzzle.categories[c] = chosen || shuffled[0];
+        syncSandboxCategorySelects(c, puzzle.categories[c]);
+      }
+    }
+
+    await refreshAllSandboxCells();
+    el("statusLine").textContent = "Grid filled in. Uncheck Sandbox mode when you're ready to play it.";
+  } catch(err){
+    el("statusLine").textContent = err.message || "Couldn't finish filling in the grid.";
+  } finally {
+    el("fillInGridBtn").disabled = false;
+    el("sandboxToggle").disabled = false;
+  }
+}
+
+function syncSandboxCategorySelects(c, cat){
+  el(`catType-${c}`).value = cat.type;
+  onSandboxCatTypeChange(c); // rebuilds the value <select> options for this type
+  el(`catValue-${c}`).value = cat.type === "decade" ? String(cat.value) : cat.value;
+  puzzle.categories[c] = cat; // onSandboxCatTypeChange() clears it above; restore it
 }
 
 const debounceTimers = {};
