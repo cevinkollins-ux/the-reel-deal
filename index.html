@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reel Ledger — MovieGrid Practice</title>
+<title>The Reel Deal</title>
 <style>
   :root{
     --paper:#efe9dc;
@@ -174,6 +174,18 @@
     font-size:0.8rem;
     color:#5a5240;
   }
+  .reveal{
+    margin-top:8px;
+    padding-top:6px;
+    border-top:1px dashed var(--ledger-line);
+    font-size:0.75rem;
+  }
+  .reveal-title{color:#5a5240;margin-bottom:3px;}
+  .reveal-list{list-style:none;margin:0;padding:0;}
+  .reveal-list li{padding:1px 0;color:var(--ink);}
+  .reveal-list li.mine{font-weight:700;color:var(--brass);}
+  .reveal-more{color:#8a8265;margin-top:2px;}
+  .reveal-empty{color:#8a8265;font-style:italic;}
   footer{
     margin-top:30px;
     font-size:0.75rem;
@@ -189,7 +201,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>The Reel Ledger</h1>
+    <h1>The Reel Deal</h1>
     <div class="sub">A practice grid, in the spirit of MovieGrid.io. Name a film linking each actor to each category — full marks for a valid answer, extra credit for pulling something obscure.</div>
   </header>
 
@@ -207,6 +219,7 @@
     <div class="scoreboard">
       <div><span class="total" id="totalScore">0</span> <span class="label">pts</span></div>
       <div class="label" id="filledCount">0 / 9 filled</div>
+      <button id="revealBtn" class="secondary" disabled>Reveal best answers</button>
     </div>
     <table class="grid">
       <thead>
@@ -237,46 +250,41 @@ const ACTORS = [
 "Ryan Gosling","Jennifer Lawrence","Chris Evans","Chris Hemsworth","Mark Ruffalo","Samuel L. Jackson",
 "Morgan Freeman","Anthony Hopkins","Kevin Spacey","Gary Oldman","Edward Norton","Kate Winslet",
 "Joaquin Phoenix","Amy Adams","Viola Davis","Octavia Spencer","Mahershala Ali","Michael B. Jordan",
-"Denzel Curry","Zendaya","Timothée Chalamet","Florence Pugh","Saoirse Ronan","Margot Robbie",
-"Anne Hathaway","Emily Blunt","Rachel McAdams","Ryan Reynolds","Jake Gyllenhaal","Paul Rudd",
-"Steve Carell","Jim Carrey","Adam Sandler","Ben Stiller","Owen Wilson","Vince Vaughn",
-"Will Ferrell","Seth Rogen","Jonah Hill","Emma Watson","Daniel Radcliffe","Rupert Grint",
-"Keira Knightley","Orlando Bloom","Elijah Wood","Ian McKellen","Viggo Mortensen","Liv Tyler",
-"Sigourney Weaver","Harrison Ford","Mark Hamill","Carrie Fisher","Samuel L Jackson","Ewan McGregor",
-"Natalie Wood","Uma Thurman","John Travolta","Samuel Jackson","Bruce Willis","Sylvester Stallone",
-"Arnold Schwarzenegger","Jean-Claude Van Damme","Vin Diesel","Dwayne Johnson","Jason Statham","Michelle Rodriguez",
-"Paul Walker","Charlize Theron","Tom Hardy","Idris Elba","Chiwetel Ejiofor","David Oyelowo",
-"Forest Whitaker","Don Cheadle","Jamie Foxx","Terrence Howard","Halle Berry","Zoe Saldana",
-"Karen Gillan","Elizabeth Olsen","Paul Bettany","Jeremy Renner","Chris Pratt","Bradley Cooper",
-"Sean Penn","Tim Robbins","Kevin Costner","Susan Sarandon","Julianne Moore","Frances McDormand",
-"Joel Coen","Holly Hunter","Laura Dern","Jeff Goldblum","Sam Neill","Richard Attenborough",
-"Michael Douglas","Kathleen Turner","Glenn Close","Jack Nicholson","Diane Keaton","Al Pacino",
-"Robert De Niro","Joe Pesci","Ray Liotta","Lorraine Bracco","Michael Caine","Christian Bale",
-"Heath Ledger","Aaron Eckhart","Maggie Gyllenhaal","Anne Hathaway","Tom Hardy","Marion Cotillard",
-"Ellen Page","Joseph Gordon-Levitt","Cillian Murphy","Emily Watson","Kenneth Branagh","Emma Thompson",
-"Colin Firth","Geoffrey Rush","Helena Bonham Carter","Judi Dench","Ralph Fiennes","Rachel Weisz",
-"Naomi Watts","Nicolas Cage","John Cusack","Winona Ryder","Christian Slater","Ethan Hawke",
-"Julie Delpy","Michael Keaton","Val Kilmer","Tommy Lee Jones","Will Smith","Josh Brolin",
-"Benicio del Toro","Javier Bardem","Penélope Cruz","Antonio Banderas","Salma Hayek","Gael García Bernal",
-"Diego Luna","Alfonso Cuarón","Guillermo del Toro","Michelle Yeoh","Chow Yun-fat","Jet Li",
-"Ken Watanabe","Rinko Kikuchi","Awkwafina","Constance Wu","Henry Golding","John Cho",
-"Lucy Liu","Sandra Oh","Steven Yeun","Kumail Nanjiani","Aziz Ansari","Mindy Kaling",
-"Priyanka Chopra","Dev Patel","Riz Ahmed","Idris Elba","David Harbour","Winona Ryder",
-"Millie Bobby Brown","Finn Wolfhard","Noah Schnapp","Gaten Matarazzo","Tom Holland","Zendaya",
-"Jacob Batalon","Marisa Tomei","Michael Keaton","J.K. Simmons","Miles Teller","Emma Stone",
-"Ryan Gosling","Amy Adams","Bradley Cooper","Sam Rockwell","Frances McDormand","Woody Harrelson",
-"Regina King","Taraji P. Henson","Octavia Spencer","Janelle Monáe","Kevin Costner","Chadwick Boseman",
+"Zendaya","Timothée Chalamet","Florence Pugh","Saoirse Ronan","Margot Robbie","Anne Hathaway",
+"Emily Blunt","Rachel McAdams","Ryan Reynolds","Jake Gyllenhaal","Paul Rudd","Steve Carell",
+"Jim Carrey","Adam Sandler","Ben Stiller","Owen Wilson","Vince Vaughn","Will Ferrell",
+"Seth Rogen","Jonah Hill","Emma Watson","Daniel Radcliffe","Rupert Grint","Keira Knightley",
+"Orlando Bloom","Elijah Wood","Ian McKellen","Viggo Mortensen","Liv Tyler","Sigourney Weaver",
+"Harrison Ford","Mark Hamill","Carrie Fisher","Ewan McGregor","Uma Thurman","John Travolta",
+"Bruce Willis","Sylvester Stallone","Arnold Schwarzenegger","Jean-Claude Van Damme","Vin Diesel","Dwayne Johnson",
+"Jason Statham","Michelle Rodriguez","Paul Walker","Tom Hardy","Idris Elba","Chiwetel Ejiofor",
+"David Oyelowo","Forest Whitaker","Don Cheadle","Jamie Foxx","Terrence Howard","Halle Berry",
+"Zoe Saldana","Karen Gillan","Elizabeth Olsen","Paul Bettany","Jeremy Renner","Chris Pratt",
+"Bradley Cooper","Sean Penn","Tim Robbins","Kevin Costner","Susan Sarandon","Julianne Moore",
+"Frances McDormand","Holly Hunter","Laura Dern","Jeff Goldblum","Sam Neill","Michael Douglas",
+"Kathleen Turner","Glenn Close","Jack Nicholson","Diane Keaton","Al Pacino","Robert De Niro",
+"Joe Pesci","Ray Liotta","Lorraine Bracco","Michael Caine","Heath Ledger","Aaron Eckhart",
+"Maggie Gyllenhaal","Marion Cotillard","Ellen Page","Joseph Gordon-Levitt","Cillian Murphy","Emily Watson",
+"Kenneth Branagh","Emma Thompson","Colin Firth","Geoffrey Rush","Helena Bonham Carter","Judi Dench",
+"Ralph Fiennes","Rachel Weisz","Naomi Watts","Nicolas Cage","John Cusack","Winona Ryder",
+"Christian Slater","Ethan Hawke","Julie Delpy","Michael Keaton","Val Kilmer","Tommy Lee Jones",
+"Josh Brolin","Benicio del Toro","Javier Bardem","Penélope Cruz","Antonio Banderas","Salma Hayek",
+"Gael García Bernal","Diego Luna","Michelle Yeoh","Chow Yun-fat","Jet Li","Ken Watanabe",
+"Rinko Kikuchi","Awkwafina","Constance Wu","Henry Golding","John Cho","Lucy Liu",
+"Sandra Oh","Steven Yeun","Kumail Nanjiani","Aziz Ansari","Mindy Kaling","Priyanka Chopra",
+"Dev Patel","Riz Ahmed","David Harbour","Millie Bobby Brown","Finn Wolfhard","Noah Schnapp",
+"Gaten Matarazzo","Tom Holland","Jacob Batalon","Marisa Tomei","J.K. Simmons","Miles Teller",
+"Sam Rockwell","Woody Harrelson","Regina King","Taraji P. Henson","Janelle Monáe","Chadwick Boseman",
 "Letitia Wright","Danai Gurira","Lupita Nyong'o","Winston Duke","Angela Bassett","Martin Freeman",
-"Andy Serkis","Benedict Cumberbatch","Tilda Swinton","Rachel McAdams","Mads Mikkelsen","Willem Dafoe",
-"Michael Shannon","Jessica Chastain","Bryce Dallas Howard","Judy Greer","Vera Farmiga","John Krasinski",
-"Emily Blunt","Domhnall Gleeson","Adam Driver","Daisy Ridley","Oscar Isaac","John Boyega",
-"Felicity Jones","Alden Ehrenreich","Donald Glover","Woody Harrelson","Paul Dano","Michael Fassbender",
-"James McAvoy","Jennifer Lawrence","Nicholas Hoult","Sophie Turner","Evan Peters","Zoe Kravitz",
-"Robert Pattinson","Kristen Stewart","Taylor Lautner","Anna Kendrick","Rebel Wilson","Melissa McCarthy",
-"Sofía Vergara","Charlize Theron","Amy Poehler","Tina Fey","Kristen Wiig","Maya Rudolph"
+"Andy Serkis","Benedict Cumberbatch","Tilda Swinton","Mads Mikkelsen","Willem Dafoe","Michael Shannon",
+"Jessica Chastain","Bryce Dallas Howard","Judy Greer","Vera Farmiga","John Krasinski","Domhnall Gleeson",
+"Adam Driver","Daisy Ridley","Oscar Isaac","John Boyega","Felicity Jones","Alden Ehrenreich",
+"Donald Glover","Paul Dano","Michael Fassbender","James McAvoy","Nicholas Hoult","Sophie Turner",
+"Evan Peters","Zoe Kravitz","Robert Pattinson","Kristen Stewart","Taylor Lautner","Anna Kendrick",
+"Rebel Wilson","Melissa McCarthy","Sofía Vergara","Amy Poehler","Tina Fey","Kristen Wiig",
+"Maya Rudolph"
 ];
-// de-dup
-const ACTOR_POOL = [...new Set(ACTORS)];
+const ACTOR_POOL = ACTORS; // already de-duplicated, one canonical spelling per actor
 
 // ---------- Category pool ----------
 const GENRES = ["Comedy","Drama","Action","Horror","Science Fiction","Romance","Crime","Thriller","Animation","Fantasy","War","Adventure","Mystery","Family","Music"];
@@ -475,6 +483,89 @@ async function categoryValidForAll(cat, actorProfiles){
   return false;
 }
 
+// ---------- Reveal: every valid answer for one actor x category cell ----------
+// Director/collection matches are only searched among the actor's MOVIE_LOOKUP_CAP
+// most popular films (same limit used to verify solvability), so an obscure credit
+// outside that window won't surface here even though it would still be accepted
+// if you typed it in yourself.
+async function getValidFilms(actorProfile, cat){
+  let matches = [];
+  if(cat.type === "genre"){
+    const gid = genreNameToId[cat.value];
+    matches = actorProfile.credits.filter(m => m.genre_ids.includes(gid));
+  } else if(cat.type === "decade"){
+    matches = actorProfile.credits.filter(m => {
+      if(!m.release_date) return false;
+      const year = parseInt(m.release_date.slice(0,4));
+      return !isNaN(year) && Math.floor(year/10)*10 === cat.value;
+    });
+  } else if(cat.type === "director"){
+    const target = normalizeName(cat.value);
+    for(const m of actorProfile.credits.slice(0, MOVIE_LOOKUP_CAP)){
+      const info = await getMovieDirectorCollection(m.id);
+      if(info.directors.includes(target)) matches.push(m);
+    }
+  } else if(cat.type === "collection"){
+    const q = cat.value.toLowerCase();
+    const qShort = q.split(":")[0].trim();
+    for(const m of actorProfile.credits.slice(0, MOVIE_LOOKUP_CAP)){
+      const info = await getMovieDirectorCollection(m.id);
+      if(info.collection && (info.collection.includes(qShort) || info.collection.includes(q))) matches.push(m);
+    }
+  } else if(cat.type === "costar"){
+    const costarProfile = await getActorProfile(cat.value);
+    const idsB = new Set(costarProfile.credits.map(x => x.id));
+    matches = actorProfile.credits.filter(m => idsB.has(m.id));
+  }
+  return matches
+    .map(m => ({title:m.title, id:m.id, vote_count:m.vote_count, rarity:rarityScore(m.vote_count)}))
+    .sort((a,b) => b.rarity - a.rarity);
+}
+
+const REVEAL_SHOWN = 8; // how many top answers to list per cell before collapsing into "+N more"
+
+function renderReveal(r, c, films){
+  const box = el(`reveal-${r}-${c}`);
+  if(!box) return;
+  if(!films.length){
+    box.innerHTML = `<div class="reveal-empty">No matches found among this actor's most notable films.</div>`;
+    return;
+  }
+  const yourTitle = cellAnswers[`${r}-${c}`] ? cellAnswers[`${r}-${c}`].title.toLowerCase() : null;
+  const shown = films.slice(0, REVEAL_SHOWN);
+  const rows = shown.map((f,i) => {
+    const mine = yourTitle && f.title.toLowerCase() === yourTitle;
+    const pts = 50 + f.rarity;
+    return `<li class="${mine ? "mine" : ""}">${i===0 ? "★ " : ""}${f.title} — ${pts} pts (${f.rarity} rarity, ${f.vote_count} votes)${mine ? " — your pick" : ""}</li>`;
+  }).join("");
+  const more = films.length > shown.length
+    ? `<div class="reveal-more">+${films.length - shown.length} more valid film(s)</div>` : "";
+  box.innerHTML = `<div class="reveal-title">Best options (${films.length} total):</div><ul class="reveal-list">${rows}</ul>${more}`;
+}
+
+async function revealAllAnswers(){
+  if(!puzzle) return;
+  el("revealBtn").disabled = true;
+  try{
+    for(let r=0; r<puzzle.actors.length; r++){
+      const actorProfile = await getActorProfile(puzzle.actors[r]);
+      for(let c=0; c<puzzle.categories.length; c++){
+        const cat = puzzle.categories[c];
+        el("statusLine").textContent = `Revealing... ${puzzle.actors[r]} × ${cat.label}`;
+        const films = await getValidFilms(actorProfile, cat);
+        renderReveal(r, c, films);
+      }
+    }
+    el("statusLine").textContent = "Best answers revealed for every cell.";
+  } catch(err){
+    el("statusLine").textContent = err.message || "Couldn't reveal answers.";
+  } finally {
+    el("revealBtn").disabled = false;
+  }
+}
+
+el("revealBtn").addEventListener("click", revealAllAnswers);
+
 const MAX_ACTOR_ATTEMPTS = 6;   // re-sample the actor trio this many times if needed
 const MAX_CATEGORY_CANDIDATES = 60; // give up on this trio after trying this many categories
 
@@ -512,6 +603,7 @@ async function pickSolvablePuzzle(){
 
 async function dealPuzzle(){
   el("newPuzzle").disabled = true;
+  el("revealBtn").disabled = true;
   el("statusLine").textContent = "Dealing...";
 
   let result;
@@ -541,6 +633,7 @@ async function dealPuzzle(){
   el("usedList").textContent = "";
   el("statusLine").textContent = "New puzzle dealt — every cell has been checked for a valid answer.";
   el("newPuzzle").disabled = false;
+  el("revealBtn").disabled = false;
 
   categories.forEach((c,i) => { el("cat"+i).textContent = c.label; });
 
@@ -562,6 +655,7 @@ async function dealPuzzle(){
         </div>
         <button class="go" data-r="${r}" data-c="${c}">Submit</button>
         <div class="fail-msg" id="fail-${r}-${c}"></div>
+        <div class="reveal" id="reveal-${r}-${c}"></div>
       `;
       tr.appendChild(td);
     });
