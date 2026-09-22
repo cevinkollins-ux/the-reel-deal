@@ -221,6 +221,7 @@
     flex-direction:column;
     box-shadow:0 8px 24px rgba(0,0,0,0.25);
   }
+  .modal-box.wide{max-width:640px;}
   .modal-header{
     display:flex;
     justify-content:space-between;
@@ -279,6 +280,18 @@
     color:#7a7259;
     text-align:center;
   }
+  .faq-link{
+    display:inline-block;
+    margin-top:6px;
+    color:var(--brass);
+    text-decoration:underline;
+    cursor:pointer;
+  }
+  .faq-item{margin-bottom:14px;}
+  .faq-item:last-child{margin-bottom:0;}
+  .faq-q{font-weight:700;margin-bottom:3px;}
+  .faq-a{color:#4a4536;line-height:1.4;}
+  .faq-a code{background:#e4dcc7;padding:1px 4px;}
   @media (max-width:640px){
     table.grid th, table.grid td{padding:6px;font-size:0.8rem;}
     td.cell{height:140px;}
@@ -327,11 +340,14 @@
     <div class="used-list" id="usedList"></div>
   </div>
 
-  <footer>Data from TMDb. Rarity score is based on TMDb's vote count for the film you name, not IMDb's.</footer>
+  <footer>
+    Data from TMDb. Rarity score is based on TMDb's vote count for the film you name, not IMDb's.
+    <div><a href="#" id="faqLink" class="faq-link">Methodology &amp; FAQ</a></div>
+  </footer>
 </div>
 
 <div class="modal-overlay" id="modalOverlay">
-  <div class="modal-box">
+  <div class="modal-box" id="modalBox">
     <div class="modal-header">
       <span id="modalTitle"></span>
       <button id="modalClose" class="modal-close-btn">Close</button>
@@ -494,17 +510,26 @@ async function ensureGenreMap(){
 }
 
 // TMDb's "movie" catalog includes non-feature entries (making-of featurettes,
-// behind-the-scenes shorts, bonus clips) credited alongside real films. These
-// almost always have zero TMDb votes, which our rarity formula treats as
-// *maximum* rarity — so without filtering, junk like "Blade Runner 2049:
-// Behind the Scenes" would outscore the real movie. isRealFeatureCredit()
-// is the single gate used everywhere a film is considered valid: profile
-// fetching, autocomplete suggestions, and the actual submit check.
+// behind-the-scenes shorts, bonus clips, theme-park ride POV videos) credited
+// alongside real films. Most have zero TMDb votes, which our rarity formula
+// would otherwise treat as *maximum* rarity — but some (e.g. Disney park
+// attraction videos) pick up a modest vote count too, so a vote floor alone
+// isn't enough. isRealFeatureCredit() is the single gate used everywhere a
+// film is considered valid: profile fetching, autocomplete suggestions, and
+// the actual submit check.
 const MIN_VOTE_COUNT = 1;
 const NON_FEATURE_TITLE_PATTERN = /\b(behind[\s-]the[\s-]scenes|making[\s-]of|gag reel|bloopers|deleted scenes|bonus (features?|footage|clip)|featurette|extended (trailer|preview)|red[\s-]band trailer|teaser trailer|first look|table read)\b/i;
 
 function isRealFeatureCredit(title, voteCount){
-  return (voteCount || 0) >= MIN_VOTE_COUNT && !NON_FEATURE_TITLE_PATTERN.test(title || "");
+  if((voteCount || 0) < MIN_VOTE_COUNT) return false;
+  if(!title) return false;
+  // TMDb entries for theme-park attractions / promo videos are consistently
+  // titled "Attraction Name | Venue" (e.g. "Star Wars: Rise of the
+  // Resistance | Disneyland Resort") — real film titles don't contain a
+  // literal pipe character, so this is a clean, low-false-positive signal.
+  if(title.includes("|")) return false;
+  if(NON_FEATURE_TITLE_PATTERN.test(title)) return false;
+  return true;
 }
 
 const personCache = new Map(); // name(lower) -> {id, credits}
@@ -647,9 +672,10 @@ async function getValidFilms(actorProfile, cat){
 
 // ---------- "See All" modal: full answer list for one cell or one actor ----------
 
-function openModal(title, bodyHtml){
+function openModal(title, bodyHtml, wide=false){
   el("modalTitle").textContent = title;
   el("modalBody").innerHTML = bodyHtml;
+  el("modalBox").classList.toggle("wide", wide);
   el("modalOverlay").style.display = "flex";
 }
 function setModalBody(html){
@@ -661,6 +687,62 @@ function closeModal(){
 el("modalClose").addEventListener("click", closeModal);
 el("modalOverlay").addEventListener("click", e => { if(e.target.id === "modalOverlay") closeModal(); });
 document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(); });
+
+// ---------- Methodology / FAQ modal ----------
+
+const FAQ_ITEMS = [
+  {
+    q: "Does a film need any TMDb votes to count as an answer?",
+    a: `Yes — at least 1 (<code>MIN_VOTE_COUNT</code>). TMDb's movie catalog includes non-feature entries
+        (making-of featurettes, behind-the-scenes shorts, bonus clips, theme-park ride POV videos)
+        credited to actors right alongside real films, and these are almost always at 0 TMDb votes —
+        e.g. "Blade Runner 2049: Behind the Scenes" under Ryan Gosling. <code>isRealFeatureCredit()</code>
+        rejects anything with 0 votes, anything with a "|" in the title (a reliable sign of a theme-park
+        or promo entry, e.g. "... | Disneyland Resort"), and anything matching a title-pattern denylist
+        ("behind the scenes," "making of," "bloopers," etc.). This is a heuristic, not a guarantee — if a
+        junk title still slips through, use <code>inspect_tmdb.py</code> (see the project README) to
+        inspect the raw TMDb data for it.`
+  },
+  {
+    q: "How is the rarity score (1–50) calculated?",
+    a: `<code>rarityScore()</code> maps a film's TMDb <code>vote_count</code> onto a 1–50 scale on a
+        log10 curve: roughly 4 votes or fewer scores the maximum (50), roughly 20,000 votes or more
+        scores the minimum (1), and everything in between is interpolated smoothly on the log scale —
+        so the gap between 10 and 100 votes moves the score a lot more than the gap between 10,000 and
+        20,000 does. A correct cell is worth 50 points (for a valid answer) + that rarity score, so
+        51–100 points total per cell.`
+  },
+  {
+    q: "Why isn't rarity based on IMDb instead?",
+    a: `IMDb has no public API at all, and TMDb has no direct equivalent of an IMDb review count — this
+        app only ever talks to TMDb, so rarity is TMDb's own vote count, not IMDb's.`
+  },
+  {
+    q: "Why didn't a film I know an actor is in get accepted for a Director or Franchise/Collection category?",
+    a: `Those two category types only check each actor's ~${MOVIE_LOOKUP_CAP} most popular films —
+        checking every film's director/collection for every actor on every deal would mean far too many
+        TMDb calls. An obscure film outside that window won't be suggested by "See All" or counted
+        toward solvability, but it'll still be accepted if you type its exact title yourself and it
+        actually satisfies the category.`
+  },
+  {
+    q: "How does the app guarantee a dealt puzzle is actually solvable?",
+    a: `Before showing a puzzle, it fetches real filmographies for the 3 sampled actors and tests category
+        candidates one at a time against all three, only keeping a category once it's confirmed to have a
+        valid answer for every actor. If a trio of actors can't yield 3 solvable categories after enough
+        tries, it resamples a new trio rather than ever showing an unsolvable grid. Sandbox mode
+        deliberately bypasses this guarantee, warning you instead if a cell has 0 valid answers.`
+  }
+];
+
+function openFaqModal(){
+  const html = FAQ_ITEMS.map(item =>
+    `<div class="faq-item"><div class="faq-q">${item.q}</div><div class="faq-a">${item.a}</div></div>`
+  ).join("");
+  openModal("Methodology & FAQ", html, true);
+}
+
+el("faqLink").addEventListener("click", e => { e.preventDefault(); openFaqModal(); });
 
 const CAPPED_TYPES = new Set(["director", "collection"]);
 
@@ -746,7 +828,7 @@ async function openCellSeeAll(r, c){
     const rows = films.map(f => {
       const mine = yourTitle && f.title.toLowerCase() === yourTitle;
       const pts = 50 + f.rarity;
-      return `<li class="${mine ? "mine" : ""}" data-movie-id="${f.id}" data-movie-title="${f.title.replace(/"/g,"&quot;")}">${f.title} — ${pts} pts (${f.rarity} rarity, ${f.vote_count} votes)${mine ? " — your pick" : ""}</li>`;
+      return `<li class="${mine ? "mine" : ""}" data-movie-id="${f.id}" data-movie-title="${f.title.replace(/"/g,"&quot;")}">${f.title} (${formatYear(f.release_date)}) — ${pts} pts (${f.rarity} rarity, ${f.vote_count} votes)${mine ? " — your pick" : ""}</li>`;
     }).join("");
     setModalBody(`${capNote}${sandboxNote}<ul class="modal-list">${rows}</ul>`);
     wireSandboxCopyableTitles(profile.id, actorName);
@@ -772,8 +854,7 @@ async function openActorSeeAll(r){
     });
     const sandboxNote = sandboxMode ? `<div class="modal-note">Click a title to copy an API-call snippet for <code>inspect_tmdb.py</code>.</div>` : "";
     const rows = films.map(f => {
-      const year = f.release_date ? f.release_date.slice(0,4) : "—";
-      return `<li data-movie-id="${f.id}" data-movie-title="${f.title.replace(/"/g,"&quot;")}">${f.title} (${year})</li>`;
+      return `<li data-movie-id="${f.id}" data-movie-title="${f.title.replace(/"/g,"&quot;")}">${f.title} (${formatYear(f.release_date)})</li>`;
     }).join("");
     setModalBody(`${sandboxNote}<ul class="modal-list">${rows}</ul>`);
     wireSandboxCopyableTitles(profile.id, actorName);
@@ -1385,14 +1466,14 @@ async function submitGuess(r, c){
 
     const rarity = rarityScore(details.vote_count);
     const points = 50 + rarity;
-    cellAnswers[key] = {title: details.title, id: movieId, points, rarity};
+    cellAnswers[key] = {title: details.title, release_date: details.release_date, id: movieId, points, rarity};
     usedMovieIds.add(movieId);
     delete cellSelections[key];
     totalScore += points;
 
     const td = el(`cell-${r}-${c}`);
     td.classList.add("correct");
-    el(`cellInner-${r}-${c}`).innerHTML = `<div class="answer"><span class="movie-title">${details.title}</span>
+    el(`cellInner-${r}-${c}`).innerHTML = `<div class="answer"><span class="movie-title">${details.title} (${formatYear(details.release_date)})</span>
       <span class="pts">+50 completeness, +${rarity} rarity (${details.vote_count} TMDb votes) — ${points} pts</span></div>`;
 
     el("totalScore").textContent = String(totalScore);
@@ -1407,9 +1488,13 @@ function normalizeName(n){
   return n.toLowerCase().replace(/[^a-z]/g,"");
 }
 
+function formatYear(releaseDate){
+  return releaseDate ? releaseDate.slice(0,4) : "—";
+}
+
 function refreshUsedList(){
-  const titles = Object.values(cellAnswers).map(a => a.title);
-  el("usedList").textContent = titles.length ? "Used so far: " + titles.join(", ") : "";
+  const entries = Object.values(cellAnswers).map(a => `${a.title} (${formatYear(a.release_date)})`);
+  el("usedList").textContent = entries.length ? "Used so far: " + entries.join(", ") : "";
 }
 </script>
 </body>
