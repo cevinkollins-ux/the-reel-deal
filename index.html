@@ -131,6 +131,7 @@
   td.cell{width:33%;height:120px;position:relative;}
   .cell input{
     width:100%;
+    min-width:0; /* override the global 220px input minimum so it fits its cell */
     font-size:0.88rem;
     padding:6px 7px;
     border:1px solid var(--ledger-line);
@@ -309,7 +310,7 @@
 <div class="wrap">
   <header>
     <h1>The Reel Deal</h1>
-    <div class="sub">A practice grid, in the spirit of MovieGrid.io. Name a film linking each actor to each category — full marks for a valid answer, extra credit for pulling something obscure.</div>
+    <div class="sub">A movie trivia grid. Name a film linking each actor to each category — full marks for a valid answer, extra credit for pulling something obscure. Play today's Daily against your friends, or deal a fresh grid any time.</div>
   </header>
 
   <div class="setup">

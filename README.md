@@ -1,6 +1,6 @@
 # The Reel Deal
 
-A single-file, browser-based practice version of [MovieGrid.io](https://moviegrid.io)'s daily puzzle. Instead of waiting for one puzzle a day, deal a new 3×3 grid (3 actors × 3 categories) whenever you want and practice naming films that satisfy each actor/category pairing.
+A single-file, browser-based movie trivia grid: 3 actors × 3 categories, and you name a film that satisfies each actor/category pairing. Play the Daily (one grid shared by everyone that day, so you can compete with friends), or deal a new grid whenever you want.
 
 ## How it works
 
