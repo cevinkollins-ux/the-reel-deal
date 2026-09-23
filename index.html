@@ -97,12 +97,18 @@
 
   .scoreboard{
     display:flex;
+    flex-wrap:wrap;
+    gap:8px 16px;
     justify-content:space-between;
     align-items:baseline;
     margin-bottom:14px;
   }
   .scoreboard .total{font-size:1.6rem;font-weight:700;}
   .scoreboard .label{font-size:0.8rem;color:#5a5240;}
+  .scoreboard-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+  .grid-info{font-size:0.82rem;color:#5a5240;margin:-6px 0 10px;min-height:1em;}
+  .grid-info strong{color:var(--ink);}
+  .grid-info .grid-code{font-family:Menlo,Consolas,monospace;background:#e4dcc7;padding:1px 5px;letter-spacing:1px;}
 
   table.grid{
     width:100%;
@@ -311,6 +317,7 @@
     <div class="row">
       <input type="password" id="apiKey" placeholder="Paste your TMDb API key">
       <button id="saveKey">Save key</button>
+      <button id="dailyPuzzle" disabled>Today's Daily</button>
       <button id="newPuzzle" class="secondary" disabled>Deal a new puzzle</button>
       <label class="sandbox-toggle"><input type="checkbox" id="sandboxToggle" disabled> Sandbox mode</label>
     </div>
@@ -321,8 +328,12 @@
     <div class="scoreboard" id="scoreboard">
       <div><span class="total" id="totalScore">0</span> <span class="label">pts</span></div>
       <div class="label" id="filledCount">0 / 9 filled</div>
-      <button id="seeAllReadyBtn" class="secondary" disabled>Ready to see answers</button>
+      <div class="scoreboard-actions">
+        <button id="shareGridBtn" class="secondary" disabled>Share grid</button>
+        <button id="seeAllReadyBtn" class="secondary" disabled>Ready to see answers</button>
+      </div>
     </div>
+    <div class="grid-info" id="gridInfo"></div>
     <div class="scoreboard" id="sandboxBar" style="display:none;">
       <div class="label">Sandbox mode — set actors &amp; categories below, or click "Fill in grid" to finish automatically.</div>
       <button id="fillInGridBtn" class="secondary">Fill in grid</button>
@@ -425,7 +436,7 @@ const COLLECTIONS = [
 "Pirates of the Caribbean","John Wick","Spider-Man","The Matrix"
 ];
 
-function buildCategoryPool(excludeActors){
+function buildCategoryPool(excludeActors, rng=Math.random){
   const pool = [];
   GENRES.forEach(g => pool.push({type:"genre", label:g, value:g}));
   DECADES.forEach(d => pool.push({type:"decade", label:`Released in the ${d}s`, value:d}));
@@ -433,21 +444,78 @@ function buildCategoryPool(excludeActors){
   COLLECTIONS.forEach(c => pool.push({type:"collection", label:c, value:c}));
   // Only sample a subset of possible co-star candidates — testing all ~180
   // other actors for a shared credit is too many API calls per deal.
-  const costarCandidates = sample(ACTOR_POOL.filter(a => !excludeActors.includes(a)), 15);
+  const costarCandidates = sample(ACTOR_POOL.filter(a => !excludeActors.includes(a)), 15, rng);
   costarCandidates.forEach(a =>
     pool.push({type:"costar", label:`Co-starred with ${a}`, value:a})
   );
   return pool;
 }
 
-function sample(arr, n){
+function sample(arr, n, rng=Math.random){
   const copy = [...arr];
   const out = [];
   while(out.length < n && copy.length){
-    const i = Math.floor(Math.random()*copy.length);
+    const i = Math.floor(rng()*copy.length);
     out.push(copy.splice(i,1)[0]);
   }
   return out;
+}
+
+// ---------- Seeded randomness (Daily puzzle) ----------
+// The Daily is dealt in each player's own browser, so everyone gets the same
+// grid only if the dealer makes the same "random" picks everywhere: a string
+// seed (the date) drives a small deterministic PRNG in place of Math.random().
+
+function hashString(str){ // 32-bit FNV-1a
+  let h = 0x811c9dc5;
+  for(let i=0; i<str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function seededRng(seed){ // mulberry32
+  let a = hashString(seed);
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// The Daily rolls over at midnight New York time for everyone, wherever they are.
+const DAILY_TIME_ZONE = "America/New_York";
+const DAILY_EPOCH = "2026-09-23"; // Daily #1
+
+function todayInNewYork(){
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: DAILY_TIME_ZONE, year:"numeric", month:"2-digit", day:"2-digit"
+  }).formatToParts(new Date());
+  const get = type => parts.find(p => p.type === type).value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function dailyNumber(dateStr){
+  const toUtc = d => { const [y,m,day] = d.split("-").map(Number); return Date.UTC(y, m-1, day); };
+  return Math.round((toUtc(dateStr) - toUtc(DAILY_EPOCH)) / 86400000) + 1;
+}
+
+function formatDailyDate(dateStr){
+  const [y,m,d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m-1, d)).toLocaleDateString("en-US", {timeZone:"UTC", weekday:"short", month:"short", day:"numeric"});
+}
+
+// Short fingerprint of a grid's actors + categories, so two players can confirm
+// at a glance that they're looking at the same grid.
+function gridCode(actors, categories){
+  const canonical = actors.join("|") + "||" + categories.map(c => `${c.type}:${c.value}`).join("|");
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L lookalikes
+  let h = hashString(canonical);
+  let code = "";
+  for(let i=0; i<4; i++){ code += alphabet[h % alphabet.length]; h = Math.floor(h / alphabet.length); }
+  return code;
 }
 
 // ---------- App state ----------
@@ -470,6 +538,8 @@ let cellAnswers = {}; // "r-c" -> {title, id, points}
 let usedMovieIds = new Set();
 let totalScore = 0;
 let sandboxMode = false;
+let gridContext = null; // {kind:"random"|"daily"|"shared"|"custom", date?:"YYYY-MM-DD"} for the grid being played
+let gridLocked = false; // true once a Daily's answers have been revealed — no more submissions
 let sandboxCellCounts = {}; // "r-c" -> valid-answer count, kept in sync by refreshSandboxCell
 
 const el = id => document.getElementById(id);
@@ -478,6 +548,7 @@ el("apiKey").value = apiKey;
 if(apiKey){
   el("statusLine").textContent = "Key loaded from this browser. Ready to deal a puzzle.";
   el("newPuzzle").disabled = false;
+  el("dailyPuzzle").disabled = false;
   el("sandboxToggle").disabled = false;
 }
 
@@ -489,7 +560,15 @@ el("saveKey").addEventListener("click", () => {
     ? "Key saved. Ready to deal a puzzle."
     : "Key set for this session — this browser isn't letting the page save data, so you'll need to paste it again next time you open the page. Ready to deal a puzzle.";
   el("newPuzzle").disabled = false;
+  el("dailyPuzzle").disabled = false;
   el("sandboxToggle").disabled = false;
+  if(pendingSharedGrid){
+    const grid = pendingSharedGrid;
+    pendingSharedGrid = null;
+    startShared(grid);
+  } else if(!puzzle){
+    startDaily();
+  }
 });
 
 el("newPuzzle").addEventListener("click", dealPuzzle);
@@ -571,19 +650,34 @@ async function getActorProfile(name){
   return profile;
 }
 
-const MOVIE_LOOKUP_CAP = 20; // most-popular-first cap on per-movie detail lookups
+const MOVIE_LOOKUP_CAP = 50; // most-popular-first cap on per-movie detail lookups
 
-const movieDetailCache = new Map(); // movieId -> {directors:[lower names], collection: lower string|null}
-async function getMovieDirectorCollection(movieId){
+// Caches the in-flight promise (not just the result) so parallel prefetches and
+// the sequential checks below never request the same film twice.
+const movieDetailCache = new Map(); // movieId -> Promise<{directors:[lower names], collection: lower string|null}>
+function getMovieDirectorCollection(movieId){
   if(movieDetailCache.has(movieId)) return movieDetailCache.get(movieId);
-  const details = await tmdb(`/movie/${movieId}`, {append_to_response:"credits"});
-  const directors = (details.credits?.crew || [])
-    .filter(p => p.job === "Director")
-    .map(p => normalizeName(p.name));
-  const collection = details.belongs_to_collection ? details.belongs_to_collection.name.toLowerCase() : null;
-  const info = {directors, collection};
-  movieDetailCache.set(movieId, info);
-  return info;
+  const pending = tmdb(`/movie/${movieId}`, {append_to_response:"credits"}).then(details => {
+    const directors = (details.credits?.crew || [])
+      .filter(p => p.job === "Director")
+      .map(p => normalizeName(p.name));
+    const collection = details.belongs_to_collection ? details.belongs_to_collection.name.toLowerCase() : null;
+    return {directors, collection};
+  });
+  pending.catch(() => movieDetailCache.delete(movieId)); // don't cache failures
+  movieDetailCache.set(movieId, pending);
+  return pending;
+}
+
+// Director/collection checks look at up to MOVIE_LOOKUP_CAP films per actor —
+// fetched a batch at a time in parallel rather than one by one, which keeps a
+// 50-film window about as fast as the old 20-film one was sequentially.
+const DETAIL_FETCH_CONCURRENCY = 10;
+async function prefetchMovieDetails(profile){
+  const ids = profile.credits.slice(0, MOVIE_LOOKUP_CAP).map(m => m.id).filter(id => !movieDetailCache.has(id));
+  for(let i=0; i<ids.length; i+=DETAIL_FETCH_CONCURRENCY){
+    await Promise.all(ids.slice(i, i+DETAIL_FETCH_CONCURRENCY).map(getMovieDirectorCollection));
+  }
 }
 
 function actorHasGenre(profile, genreId){
@@ -600,6 +694,7 @@ function actorHasDecade(profile, decade){
 
 async function actorHasDirector(profile, directorName){
   const target = normalizeName(directorName);
+  await prefetchMovieDetails(profile);
   for(const m of profile.credits.slice(0, MOVIE_LOOKUP_CAP)){
     const info = await getMovieDirectorCollection(m.id);
     if(info.directors.includes(target)) return true;
@@ -610,6 +705,7 @@ async function actorHasDirector(profile, directorName){
 async function actorHasCollection(profile, collectionQuery){
   const q = collectionQuery.toLowerCase();
   const qShort = q.split(":")[0].trim();
+  await prefetchMovieDetails(profile);
   for(const m of profile.credits.slice(0, MOVIE_LOOKUP_CAP)){
     const info = await getMovieDirectorCollection(m.id);
     if(info.collection && (info.collection.includes(qShort) || info.collection.includes(q))) return true;
@@ -665,6 +761,7 @@ async function getValidFilms(actorProfile, cat){
     });
   } else if(cat.type === "director"){
     const target = normalizeName(cat.value);
+    await prefetchMovieDetails(actorProfile);
     for(const m of actorProfile.credits.slice(0, MOVIE_LOOKUP_CAP)){
       const info = await getMovieDirectorCollection(m.id);
       if(info.directors.includes(target)) matches.push(m);
@@ -672,6 +769,7 @@ async function getValidFilms(actorProfile, cat){
   } else if(cat.type === "collection"){
     const q = cat.value.toLowerCase();
     const qShort = q.split(":")[0].trim();
+    await prefetchMovieDetails(actorProfile);
     for(const m of actorProfile.credits.slice(0, MOVIE_LOOKUP_CAP)){
       const info = await getMovieDirectorCollection(m.id);
       if(info.collection && (info.collection.includes(qShort) || info.collection.includes(q))) matches.push(m);
@@ -748,6 +846,15 @@ const FAQ_ITEMS = [
         valid answer for every actor. If a trio of actors can't yield 3 solvable categories after enough
         tries, it resamples a new trio rather than ever showing an unsolvable grid. Sandbox mode
         deliberately bypasses this guarantee, warning you instead if a cell has 0 valid answers.`
+  },
+  {
+    q: "How does everyone get the same Daily?",
+    a: `There's no server — each browser deals the Daily itself, but with a random-number generator seeded
+        by the date (New York time), so everyone's dealer makes the same picks and lands on the same grid.
+        The one catch: the dealer still checks each pick against live TMDb data, so if TMDb answered a check
+        differently for two people (it re-ranks films by popularity daily), their grids could come out
+        different. Compare the 4-letter grid code shown above the grid — if yours doesn't match a friend's,
+        have them click <b>Share grid</b> and open their link; a link to today's Daily becomes your Daily.`
   }
 ];
 
@@ -782,6 +889,13 @@ function buildApiSnippet(personId, personName, movieId, movieTitle){
   return s;
 }
 
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
 function copyToClipboard(text){
   const report = ok => {
     if(ok){
@@ -792,11 +906,7 @@ function copyToClipboard(text){
       el("statusLine").textContent = `Copy this manually: ${text}`;
     }
   };
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(() => report(true)).catch(() => report(fallbackCopy(text)));
-  } else {
-    report(fallbackCopy(text));
-  }
+  copyText(text).then(report);
 }
 
 function fallbackCopy(text){
@@ -909,24 +1019,49 @@ function enableSeeAll(){
   el("statusLine").textContent = "\"See All\" is ready on each actor and grid box — works whether or not you've answered that cell.";
 }
 
-el("seeAllReadyBtn").addEventListener("click", enableSeeAll);
+el("seeAllReadyBtn").addEventListener("click", onSeeAllReady);
+
+// In the Daily, seeing every answer is a way to finish early — so it locks
+// the grid (and saves that) rather than letting you peek and keep playing.
+function onSeeAllReady(){
+  if(gridContext && gridContext.kind === "daily" && !gridLocked){
+    const filled = Object.keys(cellAnswers).length;
+    if(filled < 9){
+      const proceed = confirm(
+        `Revealing answers ends today's Daily — you won't be able to submit any more answers to it, ` +
+        `and your score stays at ${totalScore} (${filled} / 9 filled). Continue?`
+      );
+      if(!proceed) return;
+    }
+    lockGrid();
+    saveDailyProgress();
+  }
+  enableSeeAll();
+}
 
 const MAX_ACTOR_ATTEMPTS = 6;   // re-sample the actor trio this many times if needed
+const MAX_DAILY_ACTOR_ATTEMPTS = 20; // the Daily's attempts are fixed by its seed, so allow more before giving up for the day
 const MAX_CATEGORY_CANDIDATES = 60; // give up on this trio after trying this many categories
 
-async function pickSolvablePuzzle(){
+// With a seed, every attempt gets its own PRNG seeded from (seed, attempt number),
+// so the picks for attempt N never depend on how many random draws earlier
+// attempts happened to use — two players only diverge if TMDb itself answers
+// a solvability check differently for them.
+async function pickSolvablePuzzle(seed=null){
   await ensureGenreMap();
 
-  for(let attempt = 0; attempt < MAX_ACTOR_ATTEMPTS; attempt++){
-    const actors = sample(ACTOR_POOL, 3);
+  const maxAttempts = seed ? MAX_DAILY_ACTOR_ATTEMPTS : MAX_ACTOR_ATTEMPTS;
+  for(let attempt = 0; attempt < maxAttempts; attempt++){
+    const rng = seed ? seededRng(`${seed}#${attempt}`) : Math.random;
+    const actors = sample(ACTOR_POOL, 3, rng);
     el("statusLine").textContent = `Dealing... checking ${actors.join(", ")}`;
 
     const actorProfiles = [];
     for(const name of actors) actorProfiles.push(await getActorProfile(name));
     if(actorProfiles.some(p => !p.id || p.credits.length === 0)) continue;
 
-    const catPool = buildCategoryPool(actors);
-    const shuffledCategories = sample(catPool, catPool.length); // full shuffle
+    const catPool = buildCategoryPool(actors, rng);
+    const shuffledCategories = sample(catPool, catPool.length, rng); // full shuffle
     const categories = [];
     let tested = 0;
 
@@ -946,9 +1081,15 @@ async function pickSolvablePuzzle(){
   return null;
 }
 
+function setDealButtonsDisabled(disabled){
+  el("newPuzzle").disabled = disabled;
+  el("dailyPuzzle").disabled = disabled;
+  el("sandboxToggle").disabled = disabled;
+}
+
 async function dealPuzzle(){
   closeModal();
-  el("newPuzzle").disabled = true;
+  setDealButtonsDisabled(true);
   el("seeAllReadyBtn").disabled = true;
   el("statusLine").textContent = "Dealing...";
 
@@ -957,33 +1098,330 @@ async function dealPuzzle(){
     result = await pickSolvablePuzzle();
   } catch(err){
     el("statusLine").textContent = err.message || "Something went wrong dealing a puzzle.";
-    el("newPuzzle").disabled = false;
+    setDealButtonsDisabled(false);
     return;
   }
+  setDealButtonsDisabled(false);
 
   if(!result){
     el("statusLine").textContent = "Couldn't find a fully solvable puzzle just now — click Deal again.";
-    el("newPuzzle").disabled = false;
     return;
   }
 
-  const {actors, categories} = result;
+  startGrid(result.actors, result.categories, {kind:"random"});
+  el("statusLine").textContent = "New puzzle dealt — every cell has been checked for a valid answer.";
+}
+
+// ---------- Daily puzzle: one seeded grid per New York calendar day ----------
+
+async function startDaily(){
+  const date = todayInNewYork();
+  const saved = loadDailySave(date);
+  if(saved){
+    startGrid(saved.actors, saved.categories, {kind:"daily", date}, saved);
+    el("statusLine").textContent = saved.revealed
+      ? `You've finished Daily #${dailyNumber(date)} — a new one arrives at midnight New York time.`
+      : `Welcome back — Daily #${dailyNumber(date)} picks up where you left off.`;
+    return;
+  }
+
+  closeModal();
+  setDealButtonsDisabled(true);
+  el("seeAllReadyBtn").disabled = true;
+  el("statusLine").textContent = "Dealing today's Daily...";
+
+  let result;
+  try{
+    result = await pickSolvablePuzzle(`daily:${date}`);
+  } catch(err){
+    el("statusLine").textContent = err.message || "Something went wrong dealing today's Daily.";
+    setDealButtonsDisabled(false);
+    return;
+  }
+  setDealButtonsDisabled(false);
+
+  if(!result){
+    el("statusLine").textContent = "Couldn't deal today's Daily — ask a friend who has it for their \"Share grid\" link, or deal a random puzzle instead.";
+    return;
+  }
+
+  startGrid(result.actors, result.categories, {kind:"daily", date});
+  saveDailyProgress();
+  el("statusLine").textContent = "Today's Daily is ready — everyone gets this same grid today. Compare grid codes with friends to make sure you match.";
+}
+
+el("dailyPuzzle").addEventListener("click", startDaily);
+
+// Only today's Daily is kept; an older save is simply ignored (and overwritten
+// by the next save). Stored as the same compact spec share links use, and run
+// through the same validation on the way back in.
+const DAILY_STORAGE_KEY = "reel_daily";
+
+function loadDailySave(date){
+  let data;
+  try{ data = JSON.parse(safeStorageGet(DAILY_STORAGE_KEY) || "null"); } catch(err){ return null; }
+  if(!data || data.date !== date) return null;
+  const grid = gridFromSpec(data.grid);
+  if(!grid) return null;
+  return {...grid, answers: data.answers || {}, revealed: !!data.revealed};
+}
+
+function saveDailyProgress(){
+  if(!gridContext || gridContext.kind !== "daily") return;
+  safeStorageSet(DAILY_STORAGE_KEY, JSON.stringify({
+    date: gridContext.date,
+    grid: gridToSpec(puzzle.actors, puzzle.categories),
+    answers: cellAnswers,
+    revealed: gridLocked
+  }));
+}
+
+// ---------- Share links: the whole grid, encoded in the URL ----------
+// #g=<base64url JSON> with {a:[3 actor names], c:[[type,value] x3], d?:"YYYY-MM-DD" if it's a Daily}.
+// Opening a link rebuilds that exact grid — no dealing, no TMDb lookups needed —
+// so it works even if two players' Dailies ever came out different.
+
+function gridToSpec(actors, categories, date=null){
+  const spec = {a: actors, c: categories.map(c => [c.type, c.value])};
+  if(date) spec.d = date;
+  return spec;
+}
+
+// Anything arriving from a URL (or storage) is checked against the same fixed
+// pools the dealer draws from; names end up in the page's HTML, so nothing
+// outside those lists is ever accepted.
+function gridFromSpec(spec){
+  if(!spec || !Array.isArray(spec.a) || !Array.isArray(spec.c)) return null;
+  if(spec.a.length !== 3 || spec.c.length !== 3) return null;
+  const actors = spec.a;
+  if(!actors.every(a => ACTOR_POOL.includes(a)) || new Set(actors).size !== 3) return null;
+
+  const categories = [];
+  for(const pair of spec.c){
+    if(!Array.isArray(pair) || pair.length !== 2) return null;
+    const [type, value] = pair;
+    const ok =
+      (type === "genre" && GENRES.includes(value)) ||
+      (type === "decade" && DECADES.includes(value)) ||
+      (type === "director" && DIRECTORS.includes(value)) ||
+      (type === "collection" && COLLECTIONS.includes(value)) ||
+      (type === "costar" && ACTOR_POOL.includes(value) && !actors.includes(value));
+    if(!ok) return null;
+    if(categories.some(c => c.type === type && c.value === value)) return null;
+    categories.push(categoryFromTypeAndRaw(type, String(value)));
+  }
+
+  const date = typeof spec.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(spec.d) && dailyNumber(spec.d) >= 1 ? spec.d : null;
+  return {actors, categories, date};
+}
+
+function encodeSpec(spec){
+  const bytes = new TextEncoder().encode(JSON.stringify(spec));
+  let bin = "";
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeSpec(str){
+  try{
+    const bin = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = Uint8Array.from(bin, ch => ch.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch(err){
+    return null;
+  }
+}
+
+function shareUrl(){
+  const date = gridContext && gridContext.date ? gridContext.date : null;
+  const base = location.href.split("#")[0];
+  return `${base}#g=${encodeSpec(gridToSpec(puzzle.actors, puzzle.categories, date))}`;
+}
+
+function shareText(){
+  const code = gridCode(puzzle.actors, puzzle.categories);
+  const lines = [];
+  if(gridContext && gridContext.date){
+    lines.push(`The Reel Deal — Daily #${dailyNumber(gridContext.date)} (${formatDailyDate(gridContext.date)}) · grid ${code}`);
+  } else {
+    lines.push(`The Reel Deal — grid ${code}`);
+  }
+  const filled = Object.keys(cellAnswers).length;
+  if(filled){
+    lines.push(`${totalScore} pts · ${filled}/9`);
+    for(let r=0; r<3; r++){
+      let row = "";
+      for(let c=0; c<3; c++) row += cellAnswers[`${r}-${c}`] ? "🟩" : "⬜";
+      lines.push(row);
+    }
+  }
+  lines.push(shareUrl());
+  return lines.join("\n");
+}
+
+el("shareGridBtn").addEventListener("click", async () => {
+  if(!puzzle) return;
+  const text = shareText();
+  if(await copyText(text)){
+    showToast("Grid link copied — paste it to a friend");
+    el("statusLine").textContent = "Anyone who opens that link gets this exact grid.";
+  } else {
+    showToast("Couldn't copy automatically — see the status line", false);
+    el("statusLine").textContent = `Copy this link manually: ${shareUrl()}`;
+  }
+});
+
+// Returns undefined when the URL has no grid link, null when it has a broken one.
+function takeSharedGridFromUrl(){
+  const m = location.hash.match(/^#g=([A-Za-z0-9_-]+)$/);
+  if(!m) return undefined;
+  try{ history.replaceState(null, "", location.href.split("#")[0]); } catch(err){ /* e.g. file:// quirks */ }
+  return gridFromSpec(decodeSpec(m[1]));
+}
+
+// A link to *today's* Daily becomes your Daily (progress saved as usual) — that's
+// the fix if your seeded Daily ever came out different from a friend's. Links to
+// an older Daily, or to any non-Daily grid, just load as a one-off shared grid.
+function startShared(grid){
+  const today = todayInNewYork();
+  if(grid.date !== today){
+    startGrid(grid.actors, grid.categories, {kind:"shared", date: grid.date});
+    el("statusLine").textContent = grid.date
+      ? `Loaded a friend's grid from Daily #${dailyNumber(grid.date)} — good luck!`
+      : "Loaded a friend's grid — good luck!";
+    return;
+  }
+
+  const sharedCode = gridCode(grid.actors, grid.categories);
+  const saved = loadDailySave(today);
+  if(saved && gridCode(saved.actors, saved.categories) === sharedCode){
+    startGrid(saved.actors, saved.categories, {kind:"daily", date: today}, saved);
+    el("statusLine").textContent = "That's the same grid as your Daily — picking up where you left off.";
+    return;
+  }
+  if(saved && Object.keys(saved.answers).length){
+    const mine = gridCode(saved.actors, saved.categories);
+    const proceed = confirm(
+      `This link is today's Daily as a friend got it (grid ${sharedCode}), but yours came out as grid ${mine}, ` +
+      `and you've already answered ${Object.keys(saved.answers).length} cell(s).\n\n` +
+      `Switch your Daily to your friend's grid? Your answers so far will be lost.`
+    );
+    if(!proceed){
+      startGrid(saved.actors, saved.categories, {kind:"daily", date: today}, saved);
+      el("statusLine").textContent = "Kept your own Daily.";
+      return;
+    }
+  }
+  startGrid(grid.actors, grid.categories, {kind:"daily", date: today});
+  saveDailyProgress();
+  el("statusLine").textContent = "Loaded today's Daily from a friend's link — your progress on it is saved as usual.";
+}
+
+let pendingSharedGrid = null; // a link opened before an API key was saved
+
+function handleUrlGrid(){
+  const shared = takeSharedGridFromUrl();
+  if(shared === undefined) return false;
+  if(shared === null){
+    el("statusLine").textContent = "That grid link looks broken or incomplete — ask for it again, or deal a puzzle.";
+    return true;
+  }
+  if(!apiKey){
+    pendingSharedGrid = shared;
+    el("statusLine").textContent = "Someone shared a grid with you — paste your TMDb key above and click Save key to play it.";
+    return true;
+  }
+  startShared(shared);
+  return true;
+}
+
+window.addEventListener("hashchange", handleUrlGrid);
+
+// ---------- Starting any playable grid (random, Daily, shared, or from Sandbox) ----------
+
+function startGrid(actors, categories, context, saved=null){
+  closeModal();
+  if(sandboxMode){
+    sandboxMode = false;
+    el("sandboxToggle").checked = false;
+  }
   puzzle = {actors, categories};
+  gridContext = context;
+  gridLocked = false;
   cellAnswers = {};
+  cellSelections = {};
   usedMovieIds = new Set();
   totalScore = 0;
 
   el("game").style.display = "block";
   el("scoreboard").style.display = "flex";
   el("sandboxBar").style.display = "none";
-  el("totalScore").textContent = "0";
-  el("filledCount").textContent = "0 / 9 filled";
-  el("usedList").textContent = "";
-  el("statusLine").textContent = "New puzzle dealt — every cell has been checked for a valid answer.";
-  el("newPuzzle").disabled = false;
+  setDealButtonsDisabled(false);
   el("seeAllReadyBtn").disabled = false;
+  el("shareGridBtn").disabled = false;
 
   renderPlayableGrid(actors, categories);
+
+  if(saved){
+    Object.entries(saved.answers).forEach(([key, ans]) => {
+      const [r, c] = key.split("-").map(Number);
+      if(!(r >= 0 && r < 3 && c >= 0 && c < 3) || !ans || typeof ans.title !== "string") return;
+      cellAnswers[key] = ans;
+      usedMovieIds.add(ans.id);
+      totalScore += Number(ans.points) || 0;
+      renderCorrectCell(r, c, ans);
+    });
+    if(saved.revealed){
+      lockGrid();
+      enableSeeAll();
+    }
+  }
+
+  refreshScoreDisplay();
+  renderGridInfo();
+}
+
+function renderGridInfo(){
+  const code = `grid <span class="grid-code">${gridCode(puzzle.actors, puzzle.categories)}</span>`;
+  let html;
+  if(gridContext.kind === "daily"){
+    html = `<strong>Daily #${dailyNumber(gridContext.date)}</strong> · ${formatDailyDate(gridContext.date)} · ${code} — ` +
+           `same grid for everyone today; a new one at midnight New York time`;
+  } else if(gridContext.kind === "shared"){
+    html = gridContext.date
+      ? `<strong>Shared grid</strong> from Daily #${dailyNumber(gridContext.date)} (${formatDailyDate(gridContext.date)}) · ${code}`
+      : `<strong>Shared grid</strong> · ${code}`;
+  } else if(gridContext.kind === "custom"){
+    html = `<strong>Sandbox grid</strong> · ${code}`;
+  } else {
+    html = `<strong>Random deal</strong> · ${code}`;
+  }
+  el("gridInfo").innerHTML = html;
+}
+
+function refreshScoreDisplay(){
+  el("totalScore").textContent = String(totalScore);
+  el("filledCount").textContent = `${Object.keys(cellAnswers).length} / 9 filled`;
+  refreshUsedList();
+}
+
+function renderCorrectCell(r, c, ans){
+  el(`cell-${r}-${c}`).classList.add("correct");
+  el(`cellInner-${r}-${c}`).innerHTML = `<div class="answer"><span class="movie-title">${ans.title} (${formatYear(ans.release_date)})</span>
+    <span class="pts">+50 completeness, +${ans.rarity} rarity (${ans.vote_count} TMDb votes) — ${ans.points} pts</span></div>`;
+}
+
+function lockGrid(){
+  gridLocked = true;
+  for(let r=0; r<3; r++){
+    for(let c=0; c<3; c++){
+      if(cellAnswers[`${r}-${c}`]) continue;
+      const input = el(`input-${r}-${c}`);
+      if(input) input.disabled = true;
+      const btn = el(`cell-${r}-${c}`)?.querySelector("button.go");
+      if(btn) btn.disabled = true;
+    }
+  }
 }
 
 // Builds the normal "type an answer and Submit" grid — used both by dealPuzzle()
@@ -1082,6 +1520,9 @@ function enterSandboxMode(){
   el("scoreboard").style.display = "none";
   el("sandboxBar").style.display = "flex";
   el("newPuzzle").disabled = true;
+  el("dailyPuzzle").disabled = true;
+  el("gridInfo").innerHTML = "";
+  gridContext = null;
   el("usedList").textContent = "";
   el("statusLine").textContent = "Sandbox mode — pick an actor for each row and a category for each column.";
 
@@ -1117,21 +1558,8 @@ async function exitSandboxMode(){
   }
 
   sandboxMode = false;
-  closeModal();
-  cellAnswers = {};
-  usedMovieIds = new Set();
-  totalScore = 0;
-
-  el("scoreboard").style.display = "flex";
-  el("sandboxBar").style.display = "none";
-  el("newPuzzle").disabled = false;
-  el("seeAllReadyBtn").disabled = false;
-  el("totalScore").textContent = "0";
-  el("filledCount").textContent = "0 / 9 filled";
-  el("usedList").textContent = "";
-  el("statusLine").textContent = "Your sandbox grid is ready to play — good luck!";
-
-  renderPlayableGrid(puzzle.actors, puzzle.categories);
+  startGrid(puzzle.actors, puzzle.categories, {kind:"custom"});
+  el("statusLine").textContent = "Your sandbox grid is ready to play — click Share grid to send it to a friend. Good luck!";
   return true;
 }
 
@@ -1418,7 +1846,7 @@ function rarityScore(voteCount){
 
 async function submitGuess(r, c){
   const key = `${r}-${c}`;
-  if(cellAnswers[key]) return; // already solved
+  if(cellAnswers[key] || gridLocked) return; // already solved, or Daily answers revealed
   const input = el(`input-${r}-${c}`);
   const failEl = el(`fail-${r}-${c}`);
   const title = input.value.trim();
@@ -1482,19 +1910,19 @@ async function submitGuess(r, c){
 
     const rarity = rarityScore(details.vote_count);
     const points = 50 + rarity;
-    cellAnswers[key] = {title: details.title, release_date: details.release_date, id: movieId, points, rarity};
+    // A grid switch (Deal, Daily, a link) while this check was in flight means
+    // this answer belongs to a grid that's no longer on screen — drop it.
+    if(puzzle.actors[r] !== actorName || puzzle.categories[c] !== cat || gridLocked) return;
+
+    const ans = {title: details.title, release_date: details.release_date, id: movieId, points, rarity, vote_count: details.vote_count};
+    cellAnswers[key] = ans;
     usedMovieIds.add(movieId);
     delete cellSelections[key];
     totalScore += points;
 
-    const td = el(`cell-${r}-${c}`);
-    td.classList.add("correct");
-    el(`cellInner-${r}-${c}`).innerHTML = `<div class="answer"><span class="movie-title">${details.title} (${formatYear(details.release_date)})</span>
-      <span class="pts">+50 completeness, +${rarity} rarity (${details.vote_count} TMDb votes) — ${points} pts</span></div>`;
-
-    el("totalScore").textContent = String(totalScore);
-    el("filledCount").textContent = `${Object.keys(cellAnswers).length} / 9 filled`;
-    refreshUsedList();
+    renderCorrectCell(r, c, ans);
+    refreshScoreDisplay();
+    saveDailyProgress();
   } catch(err){
     failEl.textContent = err.message || "Something went wrong.";
   }
@@ -1512,6 +1940,9 @@ function refreshUsedList(){
   const entries = Object.values(cellAnswers).map(a => `${a.title} (${formatYear(a.release_date)})`);
   el("usedList").textContent = entries.length ? "Used so far: " + entries.join(", ") : "";
 }
+
+// ---------- On load: a shared grid link wins; otherwise go straight to today's Daily ----------
+if(!handleUrlGrid() && apiKey) startDaily();
 </script>
 </body>
 </html>

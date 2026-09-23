@@ -14,6 +14,26 @@ A single-file, browser-based practice version of [MovieGrid.io](https://moviegri
   - A grid box's **See All** pops up every valid film for that actor × category pairing, sorted by rarity points descending (title descending as a tiebreak), with your own pick marked if you made one — so you can check whether a higher-scoring answer existed.
   - An actor's **See All** pops up that actor's entire filmography, sorted by release year descending (title descending as a tiebreak) — no category filter, just everything they're credited in.
 
+## Daily puzzle
+
+**Today's Daily** deals one grid that's the same for everyone that day, so friends can play the same puzzle and compare scores. Once your key is saved, the page opens straight to it.
+
+- The day rolls over at **midnight New York time** for everyone, wherever they are. Dailies are numbered from Daily #1 on 2026-09-23 (`DAILY_EPOCH`).
+- There's no server: every browser deals the Daily itself, using a random-number generator seeded by the date (`seededRng("daily:YYYY-MM-DD#attempt")`) in place of `Math.random()`. Same seed means the same picks, so everyone lands on the same grid.
+- Your progress is saved in the browser. Refreshing, dealing a random puzzle, or closing the tab and coming back later brings you back to where you left off; only today's Daily is kept.
+- **Ready to see answers** ends your Daily: it asks for confirmation, then locks any unanswered cells (the lock is saved too), so nobody can peek and keep going.
+- Wrong guesses aren't penalized.
+- **The one catch:** the dealer still checks every pick against live TMDb data. If TMDb answered a check differently for two players (it re-ranks films by popularity every day, which can move a film in or out of the 50-film window Director/Franchise checks use), their grids could come out different. The grid code above the grid (e.g. `grid XTSX`) makes that obvious at a glance. If yours doesn't match a friend's, open their share link (below).
+
+## Share grid links
+
+**Share grid** copies a link to the exact grid on screen, plus your score and a 🟩/⬜ board (Wordle-style) to paste into a group chat. Opening the link rebuilds that grid instantly, with no dealing and no TMDb lookups, so it works for random deals and Sandbox grids too.
+
+- The whole grid lives in the link (`#g=` followed by base64-encoded JSON of the 3 actor names, the 3 `[type, value]` categories, and the Daily's date if it is one). Everything in a link is checked against the same fixed actor/category lists the dealer uses, and anything else is rejected.
+- A link to **today's Daily** becomes your Daily, with progress saved as usual. That's the fix if your Daily ever came out different from a friend's. If you'd already answered cells on a different grid, it asks before replacing it.
+- A link to an older Daily, or to any non-Daily grid, opens as a one-off **Shared grid**, and progress on it isn't saved.
+- If someone opens a link before pasting their TMDb key, the grid loads as soon as they save one.
+
 ## Sandbox mode
 
 Check **Sandbox mode** (next to Deal a new puzzle) to build a grid by hand instead of dealing one randomly — useful for testing specific actor/category combinations or setting up a puzzle for someone else to play.
@@ -21,7 +41,7 @@ Check **Sandbox mode** (next to Deal a new puzzle) to build a grid by hand inste
 - Checking it asks for confirmation (it clears whatever grid is currently up), then replaces the grid with pickers: a dropdown per row to choose an actor, and a category-type + category-value dropdown pair per column.
 - As soon as both a row's actor and a column's category are set, that cell shows a live count of valid answers plus a **See All** button — the same popup used in normal play — so you can see immediately whether a pairing is trivial, impossible, or interesting before committing to it.
 - **Fill in grid** randomly completes whatever actors/categories you haven't set yet, trying to keep the result solvable against anything you *did* set by hand. It never touches or second-guesses your manual picks, even ones with few or zero valid answers — Sandbox mode is meant for exploring those too.
-- Unchecking Sandbox mode converts the current grid into a normal playable one (same actors/categories, fresh score) — but only once all 3 actors and 3 categories are set; otherwise it tells you to finish (or click Fill in grid) first. If every cell is set but at least one has 0 valid answers, you get a warning listing which cell(s) — you can still proceed, you'll just know going in that at least one box isn't solvable.
+- Unchecking Sandbox mode converts the current grid into a normal playable one (same actors/categories, fresh score), which you can then send to someone with **Share grid** — but only once all 3 actors and 3 categories are set; otherwise it tells you to finish (or click Fill in grid) first. If every cell is set but at least one has 0 valid answers, you get a warning listing which cell(s) — you can still proceed, you'll just know going in that at least one box isn't solvable.
 - Actor and category values are drawn from the same curated pools used for random dealing (`ACTOR_POOL`, `GENRES`, `DECADES`, `DIRECTORS`, `COLLECTIONS`) via dropdowns, rather than free-text TMDb search — simpler and more robust, at the cost of not being able to hand-pick an actor or director outside those lists.
 
 ### Inspecting the raw TMDb data (`inspect_tmdb.py`)
@@ -64,7 +84,7 @@ Yes — at least 1 (`MIN_VOTE_COUNT` in `index.html`). TMDb's movie catalog incl
 IMDb has no public API at all, and TMDb has no direct equivalent of an IMDb review count — this app only ever talks to TMDb, so rarity is TMDb's own vote count, not IMDb's.
 
 **Why didn't a film I know an actor is in get accepted for a Director or Franchise/Collection category?**
-Those two category types only check each actor's ~20 most popular films (`MOVIE_LOOKUP_CAP`) — checking every film's director/collection for every actor on every deal would mean far too many TMDb calls. An obscure film outside that window won't be suggested by "See All" or counted toward solvability, but it'll still be accepted if you type its exact title yourself and it actually satisfies the category.
+Those two category types only check each actor's ~50 most popular films (`MOVIE_LOOKUP_CAP`) — checking every film's director/collection for every actor on every deal would mean far too many TMDb calls. (Those 50 lookups per actor run 10 at a time in parallel, and each film is only ever fetched once per session, so the cap costs little extra time.) An obscure film outside that window won't be suggested by "See All" or counted toward solvability, but it'll still be accepted if you type its exact title yourself and it actually satisfies the category.
 
 **How does the app guarantee a dealt puzzle is actually solvable?**
 Before showing a puzzle, it fetches real filmographies for the 3 sampled actors and tests category candidates one at a time against all three, only keeping a category once it's confirmed to have a valid answer for every actor. If a trio of actors can't yield 3 solvable categories after enough tries, it resamples a new trio (up to 6 attempts) rather than ever showing an unsolvable grid. (Sandbox mode deliberately bypasses this guarantee — see above.)
@@ -78,9 +98,9 @@ Before showing a puzzle, it fetches real filmographies for the 3 sampled actors 
 
 ## Notes / known limitations
 
-- See the Methodology / FAQ above for how rarity is scored, why a film needs at least 1 TMDb vote to count, and why Director/Collection categories only look at an actor's ~20 most popular films.
+- See the Methodology / FAQ above for how rarity is scored, why a film needs at least 1 TMDb vote to count, and why Director/Collection categories only look at an actor's ~50 most popular films.
 - The actor pool (~235 names, all with substantial film work from ~1990 to today) and category pool are hardcoded near the top of the `<script>` in `index.html` — edit the `ACTORS`, `DIRECTORS`, and `COLLECTIONS` arrays to tune who/what shows up.
-- An actor's own "See All" (as opposed to a grid box's) isn't affected by the ~20-most-popular-films cap — it lists their complete filmography.
+- An actor's own "See All" (as opposed to a grid box's) isn't affected by the ~50-most-popular-films cap — it lists their complete filmography.
 - Franchise/collection matching is a loose string match against TMDb's `belongs_to_collection` field and can occasionally miss films TMDb doesn't tag into a collection.
 - No award-based categories (e.g. Oscar nominations) since TMDb doesn't track those — would need a separate static dataset to add them.
 
