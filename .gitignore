@@ -2,3 +2,4 @@
 tmdb_api_key.txt
 tmdb_inspect_output/
 __pycache__/
+.idea/

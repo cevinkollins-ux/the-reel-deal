@@ -451,7 +451,20 @@ function sample(arr, n){
 }
 
 // ---------- App state ----------
-let apiKey = localStorage.getItem("tmdb_key") || "";
+// Some mobile browsers (notably iOS Safari opening a file:// page) throw a
+// SecurityError on any localStorage access instead of just failing quietly.
+// Since this used to be a bare localStorage.getItem() call at the top of the
+// script, that error would halt every statement after it — including every
+// addEventListener() call below — leaving the whole page inert: it renders,
+// but no button does anything. These helpers make storage failures survivable.
+function safeStorageGet(key){
+  try{ return localStorage.getItem(key); } catch(err){ return null; }
+}
+function safeStorageSet(key, value){
+  try{ localStorage.setItem(key, value); return true; } catch(err){ return false; }
+}
+
+let apiKey = safeStorageGet("tmdb_key") || "";
 let puzzle = null; // {actors:[3], categories:[3]}
 let cellAnswers = {}; // "r-c" -> {title, id, points}
 let usedMovieIds = new Set();
@@ -471,8 +484,10 @@ if(apiKey){
 el("saveKey").addEventListener("click", () => {
   apiKey = el("apiKey").value.trim();
   if(!apiKey){ el("statusLine").textContent = "Enter a key first."; return; }
-  localStorage.setItem("tmdb_key", apiKey);
-  el("statusLine").textContent = "Key saved. Ready to deal a puzzle.";
+  const persisted = safeStorageSet("tmdb_key", apiKey);
+  el("statusLine").textContent = persisted
+    ? "Key saved. Ready to deal a puzzle."
+    : "Key set for this session — this browser isn't letting the page save data, so you'll need to paste it again next time you open the page. Ready to deal a puzzle.";
   el("newPuzzle").disabled = false;
   el("sandboxToggle").disabled = false;
 });
