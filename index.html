@@ -606,19 +606,28 @@ async function ensureGenreMap(){
 }
 
 // TMDb's "movie" catalog includes non-feature entries (making-of featurettes,
-// behind-the-scenes shorts, bonus clips, theme-park ride POV videos) credited
-// alongside real films. Most have zero TMDb votes, which our rarity formula
-// would otherwise treat as *maximum* rarity — but some (e.g. Disney park
-// attraction videos) pick up a modest vote count too, so a vote floor alone
-// isn't enough. isRealFeatureCredit() is the single gate used everywhere a
-// film is considered valid: profile fetching, autocomplete suggestions, and
-// the actual submit check.
+// behind-the-scenes shorts, bonus clips, theme-park ride POV videos, festival
+// shorts) credited alongside real films. Most have zero TMDb votes, which our
+// rarity formula would otherwise treat as *maximum* rarity — but some (e.g.
+// Disney park attraction videos) pick up a modest vote count too, so a vote
+// floor alone isn't enough. isRealFeatureCredit() is the single gate used
+// everywhere a film is considered valid: profile fetching, autocomplete
+// suggestions, and the actual submit check.
 const MIN_VOTE_COUNT = 1;
+const MIN_RUNTIME_MINUTES = 45;
 const NON_FEATURE_TITLE_PATTERN = /\b(behind[\s-]the[\s-]scenes|making[\s-]of|gag reel|bloopers|deleted scenes|bonus (features?|footage|clip)|featurette|extended (trailer|preview)|red[\s-]band trailer|teaser trailer|first look|table read)\b/i;
 
-function isRealFeatureCredit(title, voteCount){
+// `video`, in every place we ever get a movie object (person credits, search
+// results, movie details), is TMDb's own flag for non-theatrical content —
+// shorts, webisodes, festival reels, behind-the-scenes videos. It's a much
+// more reliable junk signal than title-pattern matching and costs no extra
+// API calls. `runtime` only exists on the /movie/{id} details response, so
+// it's only enforced where that data is actually present.
+function isRealFeatureCredit(title, voteCount, video, runtime){
   if((voteCount || 0) < MIN_VOTE_COUNT) return false;
   if(!title) return false;
+  if(video) return false;
+  if(typeof runtime === "number" && runtime > 0 && runtime < MIN_RUNTIME_MINUTES) return false;
   // TMDb entries for theme-park attractions / promo videos are consistently
   // titled "Attraction Name | Venue" (e.g. "Star Wars: Rise of the
   // Resistance | Disneyland Resort") — real film titles don't contain a
@@ -640,7 +649,7 @@ async function getActorProfile(name){
   }
   const data = await tmdb(`/person/${id}/movie_credits`);
   const credits = (data.cast || [])
-    .filter(m => isRealFeatureCredit(m.title, m.vote_count))
+    .filter(m => isRealFeatureCredit(m.title, m.vote_count, m.video))
     .map(m => ({
       id:m.id, title:m.title, genre_ids:m.genre_ids || [],
       release_date:m.release_date, popularity:m.popularity || 0, vote_count:m.vote_count || 0
@@ -681,16 +690,24 @@ async function prefetchMovieDetails(profile){
   }
 }
 
+// Genre and decade categories are broad enough that we require a real choice
+// of answers, not just one — so a player who doesn't happen to know the one
+// obscure title an actor has in a genre/decade isn't stuck. Director,
+// collection, and costar categories stay at a 1-match minimum: even famous
+// pairings (e.g. Scorsese/DiCaprio) rarely reach 5 shared films, so a 5-match
+// floor there would make those category types almost never dealable.
+const MIN_MATCHES_FOR_BROAD_CATEGORY = 5;
+
 function actorHasGenre(profile, genreId){
-  return profile.credits.some(m => m.genre_ids.includes(genreId));
+  return profile.credits.filter(m => m.genre_ids.includes(genreId)).length >= MIN_MATCHES_FOR_BROAD_CATEGORY;
 }
 
 function actorHasDecade(profile, decade){
-  return profile.credits.some(m => {
+  return profile.credits.filter(m => {
     if(!m.release_date) return false;
     const year = parseInt(m.release_date.slice(0,4));
     return !isNaN(year) && Math.floor(year/10)*10 === decade;
-  });
+  }).length >= MIN_MATCHES_FOR_BROAD_CATEGORY;
 }
 
 async function actorHasDirector(profile, directorName){
@@ -809,14 +826,18 @@ const FAQ_ITEMS = [
   {
     q: "Does a film need any TMDb votes to count as an answer?",
     a: `Yes — at least 1 (<code>MIN_VOTE_COUNT</code>). TMDb's movie catalog includes non-feature entries
-        (making-of featurettes, behind-the-scenes shorts, bonus clips, theme-park ride POV videos)
-        credited to actors right alongside real films, and these are almost always at 0 TMDb votes —
-        e.g. "Blade Runner 2049: Behind the Scenes" under Ryan Gosling. <code>isRealFeatureCredit()</code>
-        rejects anything with 0 votes, anything with a "|" in the title (a reliable sign of a theme-park
-        or promo entry, e.g. "... | Disneyland Resort"), and anything matching a title-pattern denylist
-        ("behind the scenes," "making of," "bloopers," etc.). This is a heuristic, not a guarantee — if a
-        junk title still slips through, use <code>inspect_tmdb.py</code> (see the project README) to
-        inspect the raw TMDb data for it.`
+        (making-of featurettes, behind-the-scenes shorts, bonus clips, theme-park ride POV videos,
+        festival shorts) credited to actors right alongside real films, and these are almost always at 0
+        TMDb votes — e.g. "Blade Runner 2049: Behind the Scenes" under Ryan Gosling.
+        <code>isRealFeatureCredit()</code> rejects anything with 0 votes, anything TMDb itself flags as
+        non-theatrical content (<code>video: true</code> on the TMDb movie object — this catches most
+        shorts and behind-the-scenes videos directly, e.g. "The Basement" (2011), an 11-minute short
+        under Adam Driver), anything under 45 minutes when TMDb reports a runtime (only available once
+        you're viewing a film's own detail page, not in search/autocomplete), anything with a "|" in the
+        title (a reliable sign of a theme-park or promo entry, e.g. "... | Disneyland Resort"), and
+        anything matching a title-pattern denylist ("behind the scenes," "making of," "bloopers," etc.).
+        This is a heuristic, not a guarantee — if a junk title still slips through, use
+        <code>inspect_tmdb.py</code> (see the project README) to inspect the raw TMDb data for it.`
   },
   {
     q: "How is the rarity score (1–50) calculated?",
@@ -844,9 +865,14 @@ const FAQ_ITEMS = [
     q: "How does the app guarantee a dealt puzzle is actually solvable?",
     a: `Before showing a puzzle, it fetches real filmographies for the 3 sampled actors and tests category
         candidates one at a time against all three, only keeping a category once it's confirmed to have a
-        valid answer for every actor. If a trio of actors can't yield 3 solvable categories after enough
-        tries, it resamples a new trio rather than ever showing an unsolvable grid. Sandbox mode
-        deliberately bypasses this guarantee, warning you instead if a cell has 0 valid answers.`
+        valid answer for every actor. For genre and decade categories specifically, "valid" means at
+        least ${MIN_MATCHES_FOR_BROAD_CATEGORY} matching films for that actor, not just one — so you have
+        real odds of knowing at least one answer instead of needing to land on a single obscure title.
+        Director, franchise/collection, and co-star categories keep a 1-match minimum, since even famous
+        pairings rarely reach ${MIN_MATCHES_FOR_BROAD_CATEGORY} shared films. If a trio of actors can't
+        yield 3 solvable categories after enough tries, it resamples a new trio rather than ever showing
+        an unsolvable grid. Sandbox mode deliberately bypasses this guarantee, warning you instead if a
+        cell has 0 valid answers.`
   },
   {
     q: "How does everyone get the same Daily?",
@@ -1804,7 +1830,7 @@ async function doAutocomplete(r, c, query){
   const list = el(`ac-${r}-${c}`);
   try{
     const data = await tmdb("/search/movie", {query});
-    const filtered = (data.results || []).filter(m => isRealFeatureCredit(m.title, m.vote_count));
+    const filtered = (data.results || []).filter(m => isRealFeatureCredit(m.title, m.vote_count, m.video));
     if(!filtered.length){
       list.style.display = "none";
       list.innerHTML = "";
@@ -1876,8 +1902,8 @@ async function submitGuess(r, c){
     }
     const details = await tmdb(`/movie/${movieId}`, {append_to_response:"credits"});
 
-    if(!isRealFeatureCredit(details.title, details.vote_count)){
-      failEl.textContent = `"${details.title}" doesn't look like a real feature film on TMDb (no votes / bonus content) — try another title.`;
+    if(!isRealFeatureCredit(details.title, details.vote_count, details.video, details.runtime)){
+      failEl.textContent = `"${details.title}" doesn't look like a real feature film on TMDb (no votes / bonus content / too short) — try another title.`;
       return;
     }
 
