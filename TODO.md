@@ -3,36 +3,9 @@
 Notes for picking back up. Nothing here is implemented yet — just findings and
 an approach for each, written while the context was fresh.
 
-## 1. Show the movie poster once a cell is solved
+## 1. Rarity score: votes vs. popularity vs. a blend
 
-TMDb's `/movie/{id}` response (already fetched in `submitGuess`, see
-`details` at [index.html:1448](index.html:1448)) includes `poster_path`, e.g.
-`/qJ2tW6WMUDux911r6m7haRef0WH.jpg`. Full image URL is built as:
-
-```
-https://image.tmdb.org/t/p/w200<poster_path>
-```
-
-(`w200` is a good size for a grid cell — TMDb also offers `w92`, `w154`,
-`w342`, `original`, etc. via its `/configuration` endpoint, but hardcoding
-`w200` is fine and avoids an extra API call.)
-
-- `poster_path` can be `null` for some entries — need a fallback (just skip
-  the `<img>`, or use a placeholder box) rather than showing a broken image.
-- Hook in at [index.html:1518](index.html:1518), inside the `answer` div
-  that's already built in `submitGuess`. Something like an `<img>` alongside
-  the existing `.movie-title`/`.pts` spans.
-- User is fine with this loading in a couple seconds after submit — no need
-  to preload or block the "correct" state on the image loading. Just let the
-  `<img>` load async/lazily (`loading="lazy"`) once the cell HTML is set.
-- Will need a bit of CSS on `.answer` (currently text-only, see
-  [index.html:165](index.html:165)) to lay the poster thumbnail out next to
-  or above the title/points text without breaking the grid's cell sizing —
-  worth checking narrow/mobile widths too.
-
-## 2. Rarity score: votes vs. popularity vs. a blend
-
-Current `rarityScore()` ([index.html:1438](index.html:1438)) is purely a
+Current `rarityScore()` ([index.html:2064](index.html:2064)) is purely a
 log10 curve over `vote_count`. TMDb also returns `popularity` (a
 recency-weighted activity score TMDb computes from views, votes, watchlist
 adds, etc. — it's not just "more votes = more popular", it moves faster and
@@ -58,28 +31,28 @@ Things to weigh before picking an approach:
   average of two independently-normalized log curves, or use `popularity`
   only as a tie-breaker/modifier on top of the existing vote-based score)
   and re-tune the constants in `rarityScore()` (currently tuned so ~4 votes
-  → 50, ~20,000 votes → 1, see [index.html:1438-1443](index.html:1438)) so
+  → 50, ~20,000 votes → 1, see [index.html:2064](index.html:2064)) so
   the output range and feel don't change unexpectedly for existing plays.
 - Whatever's decided, update the FAQ entry that documents the formula
   (`FAQ_ITEMS`, "How is the rarity score calculated?" around
-  [index.html:723](index.html:723)) to match.
+  [index.html:982](index.html:982)) to match.
 - Good first step next time: pull `popularity` values for a range of known
   answers (a few blockbusters, a few genuinely obscure ones) via
   `inspect_tmdb.py` and eyeball whether it actually tracks "obscurity" the
   way we want before committing to a formula.
 
-## 3. More category types
+## 2. More category types
 
-Current pool is built in `buildCategoryPool()` ([index.html:428](index.html:428))
+Current pool is built in `buildCategoryPool()` ([index.html:511](index.html:511))
 from `GENRES` (15), `DECADES` (4: 1990/2000/2010/2020),
-`DIRECTORS` ([index.html:413](index.html:413)), `COLLECTIONS` (20 franchises,
-[index.html:421](index.html:421)), plus 15 sampled co-stars. Adding a new
+`DIRECTORS` ([index.html:496](index.html:496)), `COLLECTIONS` (20 franchises,
+[index.html:504](index.html:504)), plus 15 sampled co-stars. Adding a new
 category type touches four spots:
 
 1. Add to/generate candidates in `buildCategoryPool()`.
-2. Add a solvability check in `categoryValidForAll()` ([index.html:635](index.html:635)).
-3. Add a match-lister in `getValidFilms()` ([index.html:664](index.html:664)) (powers "See All").
-4. Add the submit-time check in `submitGuess()` ([index.html:1461](index.html:1461) onward).
+2. Add a solvability check in `categoryValidForAll()` ([index.html:818](index.html:818)).
+3. Add a match-lister in `getValidFilms()` ([index.html:847](index.html:847)) (powers "See All").
+4. Add the submit-time check in `submitGuess()` ([index.html:2114](index.html:2114) onward).
 
 ### "Starts with [letter range]" (the one you asked about)
 
@@ -92,7 +65,7 @@ category type touches four spots:
 - No extra TMDb data needed — works directly off `title`, so it's as cheap
   as genre/decade (no per-movie detail fetch required).
 - Also apply the same 5-match minimum used for genre/decade
-  (`MIN_MATCHES_FOR_BROAD_CATEGORY`, [index.html:604](index.html:604)) since
+  (`MIN_MATCHES_FOR_BROAD_CATEGORY`, [index.html:777](index.html:777)) since
   this is another broad category — an actor could otherwise have exactly one
   film starting with a rare letter combination.
 
@@ -110,7 +83,7 @@ from earlier inspection):
 
 Cheap-ish — needs a per-movie detail fetch, but can piggyback on the fetch
 `actorHasDirector`/`actorHasCollection` already do via
-`getMovieDirectorCollection()` ([index.html:577](index.html:577)), which
+`getMovieDirectorCollection()` ([index.html:746](index.html:746)), which
 already hits `/movie/{id}` for every candidate up to `MOVIE_LOOKUP_CAP`. That
 function currently only extracts `directors` and `collection` from the
 response and caches it — cheap to also stash `runtime`,

@@ -173,14 +173,58 @@
   .answer{
     font-size:0.85rem;
     line-height:1.35;
+    position:relative;
   }
-  .answer .movie-title{font-weight:700;color:var(--correct);}
-  .answer .pts{
+  /* Shown instead of the poster when TMDb has none on file, or the file 404s. */
+  .answer .movie-title{
     display:block;
-    margin-top:3px;
-    font-size:0.75rem;
-    color:#5a5240;
+    font-weight:700;
+    color:var(--correct);
+    /* Start below the badge rather than beside it — a narrow cell has no room
+       to the left of the badge, and a long word would run under it. */
+    padding-top:24px;
   }
+  /* The poster is the payoff for solving a cell. Width leads (so a narrow cell
+     shrinks the poster rather than letterboxing it) and the 2:3 ratio is
+     declared up front, so the row grows once on solve rather than jumping again
+     when the file arrives. object-fit covers the few posters TMDb holds at some
+     other ratio. */
+  .answer .poster{
+    display:block;
+    width:113px;
+    max-width:100%;
+    height:auto;
+    aspect-ratio:2/3;
+    object-fit:contain;
+    background:#e4dcc7;
+    border:1px solid var(--ledger-line);
+  }
+  /* The score sits in the corner as a badge; clicking it breaks the number down. */
+  .pts-btn{
+    position:absolute;
+    top:0;
+    right:0;
+    font-family:inherit;
+    font-size:0.72rem;
+    font-weight:700;
+    line-height:1.2;
+    padding:3px 6px;
+    background:var(--card);
+    color:var(--correct);
+    border:1px solid var(--correct);
+    cursor:pointer;
+  }
+  .pts-btn:hover{background:var(--correct);color:var(--card);}
+  .points-breakdown .line{font-size:0.9rem;padding:3px 0;}
+  .points-breakdown .total{
+    font-size:1.1rem;
+    font-weight:700;
+    color:var(--correct);
+    border-top:1px solid var(--ledger-line);
+    margin-top:6px;
+    padding-top:6px;
+  }
+  .points-breakdown .note{font-size:0.78rem;color:#8a8265;margin-top:10px;line-height:1.5;}
   .fail-msg{
     font-size:0.78rem;
     color:var(--wrong);
@@ -860,6 +904,9 @@ document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal();
 // live on a separate CDN host that takes no API key — the only thing we need
 // from the API is the path, which findPerson() already captured.
 const PROFILE_IMAGE_BASE = "https://image.tmdb.org/t/p/w342";
+// Posters render at ~113px wide in a grid cell; w342 keeps them sharp on a
+// 2x display and is still only a few tens of KB.
+const POSTER_IMAGE_BASE = "https://image.tmdb.org/t/p/w342";
 
 // The search hit's profile_path is null for a small number of people even when
 // TMDb does hold photos for them, so fall back to the person's image list —
@@ -923,6 +970,13 @@ const FAQ_ITEMS = [
         answers, and it costs no points. The photo path comes back on the same
         <code>/search/person</code> call the app already makes to look the actor up, so in almost all
         cases this adds no extra TMDb requests at all.`
+  },
+  {
+    q: "What's the number in the corner of a solved cell?",
+    a: `That's what the cell scored. A correct answer turns the cell into the film's poster with its
+        score badged in the corner — click the badge for the breakdown (completeness + rarity, and the
+        vote count the rarity came from). If TMDb has no poster on file for that film, the cell shows
+        the title instead.`
   },
   {
     q: "How is the rarity score (1–50) calculated?",
@@ -1522,10 +1576,59 @@ function refreshScoreDisplay(){
   refreshUsedList();
 }
 
+// A solved cell becomes the film's poster with its score as a badge in the
+// corner. The title text only appears as the fallback when there's no poster to
+// show — it's no secret either way (it's in "Used so far"), so the poster
+// carries a tooltip with it.
 function renderCorrectCell(r, c, ans){
   el(`cell-${r}-${c}`).classList.add("correct");
-  el(`cellInner-${r}-${c}`).innerHTML = `<div class="answer"><span class="movie-title">${ans.title} (${formatYear(ans.release_date)})</span>
-    <span class="pts">+50 completeness, +${ans.rarity} rarity (${ans.vote_count} TMDb votes) — ${ans.points} pts</span></div>`;
+  const label = `${ans.title} (${formatYear(ans.release_date)})`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "answer";
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "movie-title";
+  titleEl.textContent = label;
+
+  if(ans.poster_path){
+    const img = document.createElement("img");
+    img.className = "poster";
+    img.loading = "lazy";
+    img.alt = `Poster for ${label}`;
+    img.title = label;
+    // A path can go stale between TMDb's index and its CDN — fall back to the
+    // title rather than leaving a broken-image icon in the cell.
+    img.addEventListener("error", () => img.replaceWith(titleEl));
+    img.src = POSTER_IMAGE_BASE + ans.poster_path;
+    wrap.appendChild(img);
+  } else {
+    wrap.appendChild(titleEl);
+  }
+
+  const ptsBtn = document.createElement("button");
+  ptsBtn.type = "button";
+  ptsBtn.className = "pts-btn";
+  ptsBtn.textContent = `${ans.points} pts`;
+  ptsBtn.title = "How this score breaks down";
+  ptsBtn.addEventListener("click", () => openPointsBreakdown(ans));
+  wrap.appendChild(ptsBtn);
+
+  const inner = el(`cellInner-${r}-${c}`);
+  inner.innerHTML = "";
+  inner.appendChild(wrap);
+}
+
+function openPointsBreakdown(ans){
+  openModal(`${ans.title} (${formatYear(ans.release_date)})`, `
+    <div class="points-breakdown">
+      <div class="line">+50 completeness — every valid answer scores this</div>
+      <div class="line">+${ans.rarity} rarity — ${Number(ans.vote_count || 0).toLocaleString()} TMDb votes</div>
+      <div class="total">${ans.points} pts</div>
+      <div class="note">Rarity runs 1–50 on a log curve over a film's TMDb vote count:
+        roughly 4 votes or fewer scores the full 50, roughly 20,000 or more scores 1.</div>
+    </div>
+  `);
 }
 
 function lockGrid(){
@@ -2035,7 +2138,8 @@ async function submitGuess(r, c){
     // this answer belongs to a grid that's no longer on screen — drop it.
     if(puzzle.actors[r] !== actorName || puzzle.categories[c] !== cat || gridLocked) return;
 
-    const ans = {title: details.title, release_date: details.release_date, id: movieId, points, rarity, vote_count: details.vote_count};
+    const ans = {title: details.title, release_date: details.release_date, id: movieId, points, rarity,
+                 vote_count: details.vote_count, poster_path: details.poster_path || null};
     cellAnswers[key] = ans;
     usedMovieIds.add(movieId);
     delete cellSelections[key];
