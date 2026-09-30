@@ -109,6 +109,7 @@
   .grid-info{font-size:0.82rem;color:#5a5240;margin:-6px 0 10px;min-height:1em;}
   .grid-info strong{color:var(--ink);}
   .grid-info .grid-code{font-family:Menlo,Consolas,monospace;background:#e4dcc7;padding:1px 5px;letter-spacing:1px;}
+  .grid-info .grid-hint{font-style:italic;color:#8a8265;}
 
   table.grid{
     width:100%;
@@ -192,6 +193,32 @@
     color:#5a5240;
   }
   th .actor-name{margin-bottom:4px;}
+  /* The actor name doubles as a button that opens the headshot modal — styled
+     to read as the plain bold row label it replaced, with a dotted underline
+     as the only hint that it's clickable. */
+  .actor-name-btn{
+    font-family:inherit;
+    font-size:inherit;
+    font-weight:inherit;
+    line-height:inherit;
+    text-align:left;
+    padding:0;
+    background:transparent;
+    color:var(--ink);
+    border:none;
+    border-bottom:1px dotted #8a8265;
+    cursor:pointer;
+  }
+  .actor-name-btn:hover{background:transparent;color:var(--brass);border-bottom-color:var(--brass);}
+  .headshot{text-align:center;}
+  .headshot img{
+    width:100%;
+    max-width:240px;
+    display:block;
+    margin:0 auto;
+    border:1px solid var(--ledger-line);
+  }
+  .headshot .credit{font-size:0.72rem;color:#8a8265;margin-top:8px;}
   .see-all-btn{
     font-size:0.72rem;
     padding:3px 9px;
@@ -586,9 +613,15 @@ async function tmdb(path, params={}){
   return res.json();
 }
 
-async function findPersonId(name){
+// Returns {id, profilePath} — the search hit already carries the headshot
+// path, so grabbing it here means the "click the name for a face" hint costs
+// no extra TMDb call for the overwhelming majority of people.
+async function findPerson(name){
   const data = await tmdb("/search/person", {query:name});
-  if(data.results && data.results.length) return data.results[0].id;
+  if(data.results && data.results.length){
+    const hit = data.results[0];
+    return {id:hit.id, profilePath:hit.profile_path || null};
+  }
   return null;
 }
 
@@ -637,16 +670,17 @@ function isRealFeatureCredit(title, voteCount, video, runtime){
   return true;
 }
 
-const personCache = new Map(); // name(lower) -> {id, credits}
+const personCache = new Map(); // name(lower) -> {id, credits, profilePath}
 async function getActorProfile(name){
   const key = name.toLowerCase();
   if(personCache.has(key)) return personCache.get(key);
-  const id = await findPersonId(name);
-  if(id == null){
-    const empty = {id:null, credits:[]};
+  const found = await findPerson(name);
+  if(found == null){
+    const empty = {id:null, credits:[], profilePath:null};
     personCache.set(key, empty);
     return empty;
   }
+  const {id, profilePath} = found;
   const data = await tmdb(`/person/${id}/movie_credits`);
   const credits = (data.cast || [])
     .filter(m => isRealFeatureCredit(m.title, m.vote_count, m.video))
@@ -655,7 +689,7 @@ async function getActorProfile(name){
       release_date:m.release_date, popularity:m.popularity || 0, vote_count:m.vote_count || 0
     }))
     .sort((a,b) => (b.popularity||0) - (a.popularity||0));
-  const profile = {id, credits};
+  const profile = {id, credits, profilePath};
   personCache.set(key, profile);
   return profile;
 }
@@ -820,6 +854,49 @@ el("modalClose").addEventListener("click", closeModal);
 el("modalOverlay").addEventListener("click", e => { if(e.target.id === "modalOverlay") closeModal(); });
 document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(); });
 
+// ---------- Headshot modal: a face to go with the name ----------
+// A row header is just a name, which is no hint at all if you don't recognize
+// it. Clicking the name shows TMDb's headshot for that person. Image files
+// live on a separate CDN host that takes no API key — the only thing we need
+// from the API is the path, which findPerson() already captured.
+const PROFILE_IMAGE_BASE = "https://image.tmdb.org/t/p/w342";
+
+// The search hit's profile_path is null for a small number of people even when
+// TMDb does hold photos for them, so fall back to the person's image list —
+// but only on demand, and only once per person per session either way.
+async function getHeadshotPath(profile){
+  if(profile.profilePath) return profile.profilePath;
+  if(profile.headshotLookedUp || !profile.id) return null;
+  const data = await tmdb(`/person/${profile.id}/images`);
+  const best = (data.profiles || [])[0];
+  profile.profilePath = (best && best.file_path) || null;
+  profile.headshotLookedUp = true; // set only on a clean response, so a transient failure stays retryable
+  return profile.profilePath;
+}
+
+async function openActorHeadshot(actorName){
+  openModal(actorName, `<div class="modal-status">Loading photo…</div>`);
+  try{
+    const profile = await getActorProfile(actorName);
+    const path = await getHeadshotPath(profile);
+    if(!path){
+      setModalBody(`<div class="modal-status">TMDb doesn't have a photo for this actor.</div>`);
+      return;
+    }
+    setModalBody(`<div class="headshot"><img id="headshotImg"><div class="credit">Photo via TMDb</div></div>`);
+    const img = el("headshotImg");
+    img.alt = `Photo of ${actorName}`;
+    // A path can go stale between TMDb's index and its CDN; show a line of
+    // text rather than a broken-image icon if the file doesn't load.
+    img.addEventListener("error", () => {
+      setModalBody(`<div class="modal-status">Couldn't load the photo for this actor.</div>`);
+    });
+    img.src = PROFILE_IMAGE_BASE + path;
+  } catch(err){
+    setModalBody(`<div class="modal-status">${err.message || "Couldn't load a photo."}</div>`);
+  }
+}
+
 // ---------- Methodology / FAQ modal ----------
 
 const FAQ_ITEMS = [
@@ -838,6 +915,14 @@ const FAQ_ITEMS = [
         anything matching a title-pattern denylist ("behind the scenes," "making of," "bloopers," etc.).
         This is a heuristic, not a guarantee — if a junk title still slips through, use
         <code>inspect_tmdb.py</code> (see the project README) to inspect the raw TMDb data for it.`
+  },
+  {
+    q: "I don't recognize an actor's name — can I see who they are?",
+    a: `Click the actor's name in the row header (it's the one with the dotted underline) and you'll get
+        TMDb's headshot for that person. It's a memory jog only — it doesn't reveal or narrow down any
+        answers, and it costs no points. The photo path comes back on the same
+        <code>/search/person</code> call the app already makes to look the actor up, so in almost all
+        cases this adds no extra TMDb requests at all.`
   },
   {
     q: "How is the rarity score (1–50) calculated?",
@@ -1423,7 +1508,12 @@ function renderGridInfo(){
   } else {
     html = `<strong>Random deal</strong> · ${code}`;
   }
-  el("gridInfo").innerHTML = html;
+  // The status line is context-specific (Daily, shared, sandbox, ...) and gets
+  // overwritten by the next action, so the headshot hint lives here instead —
+  // this bar renders once for every grid, whatever started it, and persists
+  // while you play.
+  el("gridInfo").innerHTML = html +
+    ` · <span class="grid-hint">don't recognize an actor? click their name for a photo</span>`;
 }
 
 function refreshScoreDisplay(){
@@ -1462,9 +1552,13 @@ function renderPlayableGrid(actors, categories){
     const tr = document.createElement("tr");
     const th = document.createElement("th");
     th.innerHTML = `
-      <div class="actor-name">${actor}</div>
+      <div class="actor-name"><button type="button" class="actor-name-btn"></button></div>
       <div class="actor-seeall-wrap" id="seeAllActor-${r}"></div>
     `;
+    const nameBtn = th.querySelector(".actor-name-btn");
+    nameBtn.textContent = actor;
+    nameBtn.title = `See a photo of ${actor}`;
+    nameBtn.addEventListener("click", () => openActorHeadshot(actor));
     tr.appendChild(th);
     categories.forEach((cat, c) => {
       const td = document.createElement("td");
