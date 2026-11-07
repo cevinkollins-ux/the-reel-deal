@@ -108,3 +108,37 @@ More involved / worth flagging as open questions rather than committing to:
 - **Same release year** (as opposed to decade) — probably too narrow per
   actor to reliably hit the 5-match minimum; would likely need to stay at
   the 1-match floor like director/collection.
+
+### Ideas borrowed from Movie Grid
+
+All of these work off `title` / `release_date`, which are already on the
+credits objects — no extra API calls, so they're as cheap as genre/decade and
+should use the same 5-match minimum (`MIN_MATCHES_FOR_BROAD_CATEGORY`).
+
+Release-date cutoffs (broader than decades):
+
+- **Released before 2000** / **Released 2000 or later**
+- **Released before 1900s-style cutoffs**, e.g. "Released before 1980" /
+  "Released 1980 or later" — pick a few cutoff years.
+- **Released 2010–2026** (or other multi-decade spans).
+
+Title letters:
+
+- **Title contains F, V, W or Y** (or other sets of less-common letters).
+- **Starts with [letter range]** — already written up above (random 7–10
+  letter span like "D–M", strip leading articles first).
+
+Title word count — ignore articles/filler ("the", "a", "an", "and") when
+counting, so "The Matrix" is 1 word and "Pride and Prejudice" is 2:
+
+- **1-word title**
+- **2-word title**
+- **3-word title**
+- **More than 3 words**
+
+Numbers:
+
+- **Title contains a number** — digits or spelled out both count ("3",
+  "Three", "Seven", "21", "2001"). Needs a list of number words
+  (one–twenty, thirty…hundred, thousand, maybe "first/second") plus a
+  digit regex.
