@@ -118,8 +118,7 @@ should use the same 5-match minimum (`MIN_MATCHES_FOR_BROAD_CATEGORY`).
 Release-date cutoffs (broader than decades):
 
 - **Released before 2000** / **Released 2000 or later**
-- **Released before 1900s-style cutoffs**, e.g. "Released before 1980" /
-  "Released 1980 or later" — pick a few cutoff years.
+- Same before/after pair for other cutoff years (e.g. 1990, 1980).
 - **Released 2010–2026** (or other multi-decade spans).
 
 Title letters:
