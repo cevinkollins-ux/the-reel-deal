@@ -1,7 +1,7 @@
 # To-do: next session
 
-Notes for picking back up. Nothing here is implemented yet — just findings and
-an approach for each, written while the context was fresh.
+Notes for picking back up: findings and an approach for each, written while
+the context was fresh. Items marked **Done** have since been built.
 
 ## 1. Rarity score: votes vs. popularity vs. a blend
 
@@ -54,7 +54,42 @@ category type touches four spots:
 3. Add a match-lister in `getValidFilms()` ([index.html:847](index.html:847)) (powers "See All").
 4. Add the submit-time check in `submitGuess()` ([index.html:2114](index.html:2114) onward).
 
-### "Starts with [letter range]" (the one you asked about)
+It also has to go in three more places, or the type half-works:
+
+5. Share-link and Daily-save checking in `gridFromSpec()`. Saved Daily
+   progress goes through this same check, so a type missing here makes a
+   Daily with that category lose its progress on reload.
+6. Sandbox: `CATEGORY_TYPE_OPTIONS`, `categoryFromTypeAndRaw()`, and the
+   value list in `onSandboxCatTypeChange()`.
+7. The FAQ (`FAQ_ITEMS`) and the README's Categories table.
+
+Any change to the category pool also changes the Daily, because the Daily's
+picks come from a date-seeded randomizer run over that pool. New types should
+start on a set date (see `TITLE_YEAR_CATEGORIES_FROM`) so a Daily already in
+progress doesn't change under anyone.
+
+### Title and release-year ideas (added 2026-11-08)
+
+- **Done:** Title starts with a letter range, 7–10 letters wide (e.g. "D–M").
+- **Done:** Title contains F, V, W or Y. A common category on other movie
+  grids, and a good mix of fairly rare letters.
+- **Done:** Released within a year range of 5–10 years (e.g. "Released
+  2010–2016").
+- Released before 2000, and a matching "2000 or later". The same pair could
+  work for other cutoff years (e.g. before/after 1990).
+- 1-word title.
+- 2-word title.
+- 3-word title.
+- More than 3 words in the title.
+  - For all four word counts, articles and "and" don't count as words
+    ("the", "a", "an", "and"), so "The Dark Knight" is 2 words.
+- Title contains a number, written as digits or spelled out ("3" and
+  "Three" both count).
+
+All of these need only the title or release date, which every credit
+already has, so they cost no extra TMDb calls.
+
+### "Starts with [letter range]" — **Done** (built at 7–10 letters wide)
 
 - Pick a random contiguous range of the alphabet 7–13 letters wide (e.g. "E–M"),
   label it like `Starts with E–M`.

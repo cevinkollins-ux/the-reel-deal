@@ -508,7 +508,96 @@ const COLLECTIONS = [
 "Pirates of the Caribbean","John Wick","Spider-Man","The Matrix"
 ];
 
-function buildCategoryPool(excludeActors, rng=Math.random){
+// ---------- Title and release-year categories ----------
+// These need only a film's title and release date, which every credit
+// already carries, so they cost no extra TMDb calls.
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const LETTER_RANGE_MIN = 7, LETTER_RANGE_MAX = 10; // letters covered, inclusive: "D-M" is 10
+const CONTAINS_LETTER_SETS = ["FVWY"];
+const YEAR_RANGE_EARLIEST = 1980;
+const YEAR_RANGE_MIN = 5, YEAR_RANGE_MAX = 10; // years covered, inclusive: "2010-2014" is 5
+// There are dozens of possible letter and year ranges, so a deal samples only
+// a few of each. Otherwise they'd crowd every other category type out.
+const LETTER_RANGES_PER_DEAL = 3;
+const YEAR_RANGES_PER_DEAL = 3;
+// Dailies before this date were dealt without these categories. Leaving them
+// out for earlier dates keeps those Dailies the same for anyone still on one.
+const TITLE_YEAR_CATEGORIES_FROM = "2026-11-09";
+const TITLE_YEAR_TYPES = ["startswith", "contains", "years"];
+
+function allLetterRanges(){ // ["A-G", "A-H", ..., "T-Z"]
+  const out = [];
+  for(let i=0; i<ALPHABET.length; i++){
+    for(let n=LETTER_RANGE_MIN; n<=LETTER_RANGE_MAX && i+n<=ALPHABET.length; n++){
+      out.push(`${ALPHABET[i]}-${ALPHABET[i+n-1]}`);
+    }
+  }
+  return out;
+}
+
+function latestRangeYear(date){
+  return parseInt((date || todayInNewYork()).slice(0,4));
+}
+
+function allYearRanges(latest){ // ["1980-1984", ..., "2017-2026"]
+  const out = [];
+  for(let start=YEAR_RANGE_EARLIEST; start<=latest; start++){
+    for(let n=YEAR_RANGE_MIN; n<=YEAR_RANGE_MAX && start+n-1<=latest; n++){
+      const end = start+n-1;
+      if(start % 10 === 0 && n === 10) continue; // exactly a decade, already its own category
+      out.push(`${start}-${end}`);
+    }
+  }
+  return out;
+}
+
+function lettersLabel(letters){ // "FVWY" -> "F, V, W or Y"
+  const chars = letters.split("");
+  return chars.length > 1 ? chars.slice(0,-1).join(", ") + " or " + chars[chars.length-1] : letters;
+}
+
+// Uppercase, accents dropped ("Élite" -> "ELITE").
+function plainTitle(title){
+  return (title || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+}
+
+// The letter a title is alphabetized under: leading punctuation and a leading
+// The/A/An are skipped, so "The Matrix" is M. A title that starts with a digit
+// ("10 Cloverfield Lane") has no letter and fits no range.
+function titleFirstLetter(title){
+  const t = plainTitle(title)
+    .replace(/^[^A-Z0-9]+/, "")
+    .replace(/^(THE|AN|A)\s+/, "")
+    .replace(/^[^A-Z0-9]+/, "");
+  return /^[A-Z]/.test(t) ? t[0] : null;
+}
+
+function releaseYear(releaseDate){
+  const year = releaseDate ? parseInt(releaseDate.slice(0,4)) : NaN;
+  return isNaN(year) ? null : year;
+}
+
+// film is anything with {title, release_date}: a credit, or a /movie/{id} response.
+function filmFitsTitleYearCategory(cat, film){
+  if(cat.type === "startswith"){
+    const [from, to] = cat.value.split("-");
+    const letter = titleFirstLetter(film.title);
+    return letter !== null && letter >= from && letter <= to;
+  }
+  if(cat.type === "contains"){
+    const t = plainTitle(film.title);
+    return cat.value.split("").some(ch => t.includes(ch));
+  }
+  if(cat.type === "years"){
+    const [from, to] = cat.value.split("-").map(Number);
+    const year = releaseYear(film.release_date);
+    return year !== null && year >= from && year <= to;
+  }
+  return false;
+}
+
+// `date` is the Daily's date when dealing a Daily, null otherwise.
+function buildCategoryPool(excludeActors, rng=Math.random, date=null){
   const pool = [];
   GENRES.forEach(g => pool.push({type:"genre", label:g, value:g}));
   DECADES.forEach(d => pool.push({type:"decade", label:`Released in the ${d}s`, value:d}));
@@ -520,6 +609,15 @@ function buildCategoryPool(excludeActors, rng=Math.random){
   costarCandidates.forEach(a =>
     pool.push({type:"costar", label:`Co-starred with ${a}`, value:a})
   );
+  // Added after the costars, so for older Dailies the random picks above
+  // (and so the whole grid) come out exactly as they always did.
+  if(!date || date >= TITLE_YEAR_CATEGORIES_FROM){
+    sample(allLetterRanges(), LETTER_RANGES_PER_DEAL, rng)
+      .forEach(v => pool.push(categoryFromTypeAndRaw("startswith", v)));
+    CONTAINS_LETTER_SETS.forEach(v => pool.push(categoryFromTypeAndRaw("contains", v)));
+    sample(allYearRanges(latestRangeYear(date)), YEAR_RANGES_PER_DEAL, rng)
+      .forEach(v => pool.push(categoryFromTypeAndRaw("years", v)));
+  }
   return pool;
 }
 
@@ -836,6 +934,11 @@ async function categoryValidForAll(cat, actorProfiles){
     for(const p of actorProfiles){ if(!(await actorsShareCredit(p, costarProfile))) return false; }
     return true;
   }
+  if(TITLE_YEAR_TYPES.includes(cat.type)){
+    return actorProfiles.every(p =>
+      p.credits.filter(m => filmFitsTitleYearCategory(cat, m)).length >= MIN_MATCHES_FOR_BROAD_CATEGORY
+    );
+  }
   return false;
 }
 
@@ -874,6 +977,8 @@ async function getValidFilms(actorProfile, cat){
     const costarProfile = await getActorProfile(cat.value);
     const idsB = new Set(costarProfile.credits.map(x => x.id));
     matches = actorProfile.credits.filter(m => idsB.has(m.id));
+  } else if(TITLE_YEAR_TYPES.includes(cat.type)){
+    matches = actorProfile.credits.filter(m => filmFitsTitleYearCategory(cat, m));
   }
   return matches
     .map(m => ({title:m.title, id:m.id, vote_count:m.vote_count, release_date:m.release_date, rarity:rarityScore(m.vote_count)}))
@@ -1001,10 +1106,19 @@ const FAQ_ITEMS = [
         actually satisfies the category.`
   },
   {
+    q: "How do the title-letter and year-range categories work?",
+    a: `<b>Title starts with</b> (e.g. "D–M") goes by the letter a title is alphabetized under: a
+        leading "The", "A" or "An" is skipped, so "The Matrix" counts as M, and accents are ignored. A
+        title that starts with a number ("10 Cloverfield Lane") doesn't fit any letter range.
+        <b>Title contains F, V, W or Y</b> checks the whole title, "The" included, for any one of those
+        letters. <b>Released</b> ranges (e.g. "Released 2010–2016") include both end years. All three
+        go by TMDb's English title and release date.`
+  },
+  {
     q: "How does the app guarantee a dealt puzzle is actually solvable?",
     a: `Before showing a puzzle, it fetches real filmographies for the 3 sampled actors and tests category
         candidates one at a time against all three, only keeping a category once it's confirmed to have a
-        valid answer for every actor. For genre and decade categories specifically, "valid" means at
+        valid answer for every actor. For genre, decade, title-letter and year-range categories, "valid" means at
         least ${MIN_MATCHES_FOR_BROAD_CATEGORY} matching films for that actor, not just one — so you have
         real odds of knowing at least one answer instead of needing to land on a single obscure title.
         Director, franchise/collection, and co-star categories keep a 1-match minimum, since even famous
@@ -1213,7 +1327,7 @@ const MAX_CATEGORY_CANDIDATES = 60; // give up on this trio after trying this ma
 // so the picks for attempt N never depend on how many random draws earlier
 // attempts happened to use — two players only diverge if TMDb itself answers
 // a solvability check differently for them.
-async function pickSolvablePuzzle(seed=null){
+async function pickSolvablePuzzle(seed=null, dailyDate=null){
   await ensureGenreMap();
 
   const maxAttempts = seed ? MAX_DAILY_ACTOR_ATTEMPTS : MAX_ACTOR_ATTEMPTS;
@@ -1226,7 +1340,7 @@ async function pickSolvablePuzzle(seed=null){
     for(const name of actors) actorProfiles.push(await getActorProfile(name));
     if(actorProfiles.some(p => !p.id || p.credits.length === 0)) continue;
 
-    const catPool = buildCategoryPool(actors, rng);
+    const catPool = buildCategoryPool(actors, rng, dailyDate);
     const shuffledCategories = sample(catPool, catPool.length, rng); // full shuffle
     const categories = [];
     let tested = 0;
@@ -1298,7 +1412,7 @@ async function startDaily(){
 
   let result;
   try{
-    result = await pickSolvablePuzzle(`daily:${date}`);
+    result = await pickSolvablePuzzle(`daily:${date}`, date);
   } catch(err){
     el("statusLine").textContent = err.message || "Something went wrong dealing today's Daily.";
     setDealButtonsDisabled(false);
@@ -1371,7 +1485,10 @@ function gridFromSpec(spec){
       (type === "decade" && DECADES.includes(value)) ||
       (type === "director" && DIRECTORS.includes(value)) ||
       (type === "collection" && COLLECTIONS.includes(value)) ||
-      (type === "costar" && ACTOR_POOL.includes(value) && !actors.includes(value));
+      (type === "costar" && ACTOR_POOL.includes(value) && !actors.includes(value)) ||
+      (type === "startswith" && allLetterRanges().includes(value)) ||
+      (type === "contains" && CONTAINS_LETTER_SETS.includes(value)) ||
+      (type === "years" && allYearRanges(latestRangeYear()).includes(value));
     if(!ok) return null;
     if(categories.some(c => c.type === type && c.value === value)) return null;
     categories.push(categoryFromTypeAndRaw(type, String(value)));
@@ -1796,7 +1913,10 @@ const CATEGORY_TYPE_OPTIONS = [
   {value:"decade", label:"Decade"},
   {value:"director", label:"Director"},
   {value:"collection", label:"Franchise / collection"},
-  {value:"costar", label:"Co-star"}
+  {value:"costar", label:"Co-star"},
+  {value:"startswith", label:"Title starts with"},
+  {value:"contains", label:"Title contains"},
+  {value:"years", label:"Release-year range"}
 ];
 
 function renderSandboxGrid(){
@@ -1866,6 +1986,9 @@ function categoryFromTypeAndRaw(type, raw){
   if(type === "director") return {type, label:`Directed by ${raw}`, value:raw};
   if(type === "collection") return {type, label:raw, value:raw};
   if(type === "costar") return {type, label:`Co-starred with ${raw}`, value:raw};
+  if(type === "startswith") return {type, label:`Title starts with ${raw.replace("-", "–")}`, value:raw};
+  if(type === "contains") return {type, label:`Title contains ${lettersLabel(raw)}`, value:raw};
+  if(type === "years") return {type, label:`Released ${raw.replace("-", "–")}`, value:raw};
   return null;
 }
 
@@ -1887,6 +2010,9 @@ function onSandboxCatTypeChange(c){
   else if(type === "director") options = DIRECTORS.map(d => ({value:d, label:d}));
   else if(type === "collection") options = COLLECTIONS.map(cName => ({value:cName, label:cName}));
   else if(type === "costar") options = [...ACTOR_POOL].sort().map(a => ({value:a, label:a}));
+  else if(type === "startswith") options = allLetterRanges().map(v => ({value:v, label:v.replace("-", "–")}));
+  else if(type === "contains") options = CONTAINS_LETTER_SETS.map(v => ({value:v, label:lettersLabel(v)}));
+  else if(type === "years") options = allYearRanges(latestRangeYear()).reverse().map(v => ({value:v, label:v.replace("-", "–")}));
 
   valueSelect.innerHTML = `<option value="">Choose…</option>` + options.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
   valueSelect.style.display = "inline-block";
@@ -2125,6 +2251,8 @@ async function submitGuess(r, c){
               collName.includes(cat.value.toLowerCase());
     } else if(cat.type === "costar"){
       catOk = castNames.includes(cat.value.toLowerCase());
+    } else if(TITLE_YEAR_TYPES.includes(cat.type)){
+      catOk = filmFitsTitleYearCategory(cat, details);
     }
 
     if(!catOk){

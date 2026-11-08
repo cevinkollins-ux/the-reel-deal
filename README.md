@@ -43,7 +43,7 @@ Check **Sandbox mode** (next to Deal a new puzzle) to build a grid by hand inste
 - As soon as both a row's actor and a column's category are set, that cell shows a live count of valid answers plus a **See All** button — the same popup used in normal play — so you can see immediately whether a pairing is trivial, impossible, or interesting before committing to it.
 - **Fill in grid** randomly completes whatever actors/categories you haven't set yet, trying to keep the result solvable against anything you *did* set by hand. It never touches or second-guesses your manual picks, even ones with few or zero valid answers — Sandbox mode is meant for exploring those too.
 - Unchecking Sandbox mode converts the current grid into a normal playable one (same actors/categories, fresh score), which you can then send to someone with **Share grid** — but only once all 3 actors and 3 categories are set; otherwise it tells you to finish (or click Fill in grid) first. If every cell is set but at least one has 0 valid answers, you get a warning listing which cell(s) — you can still proceed, you'll just know going in that at least one box isn't solvable.
-- Actor and category values are drawn from the same curated pools used for random dealing (`ACTOR_POOL`, `GENRES`, `DECADES`, `DIRECTORS`, `COLLECTIONS`) via dropdowns, rather than free-text TMDb search — simpler and more robust, at the cost of not being able to hand-pick an actor or director outside those lists.
+- Actor and category values are drawn from the same curated pools used for random dealing (`ACTOR_POOL`, `GENRES`, `DECADES`, `DIRECTORS`, `COLLECTIONS`, plus every valid letter range, letter set and year range) via dropdowns, rather than free-text TMDb search — simpler and more robust, at the cost of not being able to hand-pick an actor or director outside those lists.
 
 ### Inspecting the raw TMDb data (`inspect_tmdb.py`)
 
@@ -59,7 +59,7 @@ The script needs its own TMDb API key (separate from the one in the browser page
 
 ## Categories
 
-Every category comes from one of five fixed types, defined near the top of the `<script>` in `index.html`:
+Every category comes from one of eight fixed types, defined near the top of the `<script>` in `index.html`:
 
 | Type | Example | Source array |
 |---|---|---|
@@ -68,8 +68,17 @@ Every category comes from one of five fixed types, defined near the top of the `
 | Director | "Directed by Christopher Nolan" | `DIRECTORS` |
 | Franchise / collection | "Marvel Cinematic Universe" | `COLLECTIONS` |
 | Co-star | "Co-starred with Tom Hanks" | sampled from the actor pool itself |
+| Title starts with | "Title starts with D–M" | any 7–10 letter span of the alphabet (`allLetterRanges()`) |
+| Title contains | "Title contains F, V, W or Y" | `CONTAINS_LETTER_SETS` |
+| Release-year range | "Released 2010–2016" | any 5–10 year span from 1980 to this year (`allYearRanges()`) |
 
-A deal picks 3 categories at random from the combined pool of all five types (co-star candidates are limited to a random 15 other actors per deal, to keep the solvability check fast).
+A deal picks 3 categories at random from the combined pool of all eight types (co-star candidates are limited to a random 15 other actors per deal, to keep the solvability check fast; letter and year ranges are limited to 3 of each per deal, so the dozens of possible ranges don't crowd out the other types).
+
+- **Title starts with** goes by the letter a title is alphabetized under: a leading "The", "A" or "An" is skipped ("The Matrix" is M), and accents are ignored. A title starting with a number fits no range.
+- **Title contains** checks the whole title, "The" included.
+- **Release-year ranges** include both end years. A range that's exactly a decade (e.g. 2010–2019) is left out, since Decade covers it.
+- Like Genre and Decade, these three need at least 5 matching films per actor before they're dealt. They use only a film's title and release date, so they cost no extra TMDb calls.
+- These three types only appear in Dailies from 2026-11-09 on (`TITLE_YEAR_CATEGORIES_FROM`), so a Daily already in progress didn't change when they were added. Random deals and Sandbox have them now.
 
 ## Methodology / FAQ
 
