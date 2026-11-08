@@ -43,30 +43,23 @@ Things to weigh before picking an approach:
 
 ## 2. More category types
 
-Current pool is built in `buildCategoryPool()` ([index.html:511](index.html:511))
-from `GENRES` (15), `DECADES` (4: 1990/2000/2010/2020),
-`DIRECTORS` ([index.html:496](index.html:496)), `COLLECTIONS` (20 franchises,
-[index.html:504](index.html:504)), plus 15 sampled co-stars. Adding a new
-category type touches four spots:
+**Done (2026-11-08):** each category type is now one entry in
+`CATEGORY_TYPES` in `index.html`. The dealer, solvability checks, See All,
+guess checking, Sandbox and share links all read from that table, so adding a
+type means adding one entry (the comment above the table lists its fields),
+plus a line in the FAQ (`FAQ_ITEMS`) and the README's Categories table.
 
-1. Add to/generate candidates in `buildCategoryPool()`.
-2. Add a solvability check in `categoryValidForAll()` ([index.html:818](index.html:818)).
-3. Add a match-lister in `getValidFilms()` ([index.html:847](index.html:847)) (powers "See All").
-4. Add the submit-time check in `submitGuess()` ([index.html:2114](index.html:2114) onward).
+New types go at the **end** of the table, and get a `dealsFrom` date. A deal
+draws its random values in table order, and the Daily's picks come from a
+date-seeded randomizer, so a type added anywhere else, or without a start
+date, would change Dailies people are already playing.
 
-It also has to go in three more places, or the type half-works:
-
-5. Share-link and Daily-save checking in `gridFromSpec()`. Saved Daily
-   progress goes through this same check, so a type missing here makes a
-   Daily with that category lose its progress on reload.
-6. Sandbox: `CATEGORY_TYPE_OPTIONS`, `categoryFromTypeAndRaw()`, and the
-   value list in `onSandboxCatTypeChange()`.
-7. The FAQ (`FAQ_ITEMS`) and the README's Categories table.
-
-Any change to the category pool also changes the Daily, because the Daily's
-picks come from a date-seeded randomizer run over that pool. New types should
-start on a set date (see `TITLE_YEAR_CATEGORIES_FROM`) so a Daily already in
-progress doesn't change under anyone.
+**Done (2026-11-08):** a dealt grid has at most one category of each type
+(`ONE_CATEGORY_PER_TYPE_FROM`, Dailies from 2026-11-10 on). Open question:
+Decade and Release-year range are separate types, so a grid can still have
+"Released in the 2010s" next to "Released 2011–2016". Same for the two
+title-letter types. If that feels repetitive, group them as one "family" for
+this rule.
 
 ### Title and release-year ideas (added 2026-11-08)
 

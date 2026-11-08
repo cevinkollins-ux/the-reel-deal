@@ -523,7 +523,6 @@ const YEAR_RANGES_PER_DEAL = 3;
 // Dailies before this date were dealt without these categories. Leaving them
 // out for earlier dates keeps those Dailies the same for anyone still on one.
 const TITLE_YEAR_CATEGORIES_FROM = "2026-11-09";
-const TITLE_YEAR_TYPES = ["startswith", "contains", "years"];
 
 function allLetterRanges(){ // ["A-G", "A-H", ..., "T-Z"]
   const out = [];
@@ -577,48 +576,28 @@ function releaseYear(releaseDate){
   return isNaN(year) ? null : year;
 }
 
-// film is anything with {title, release_date}: a credit, or a /movie/{id} response.
-function filmFitsTitleYearCategory(cat, film){
-  if(cat.type === "startswith"){
-    const [from, to] = cat.value.split("-");
-    const letter = titleFirstLetter(film.title);
-    return letter !== null && letter >= from && letter <= to;
-  }
-  if(cat.type === "contains"){
-    const t = plainTitle(film.title);
-    return cat.value.split("").some(ch => t.includes(ch));
-  }
-  if(cat.type === "years"){
-    const [from, to] = cat.value.split("-").map(Number);
-    const year = releaseYear(film.release_date);
-    return year !== null && year >= from && year <= to;
-  }
-  return false;
+function dashed(range){ return range.replace("-", "–"); } // "D-M" -> "D–M"
+
+function titleStartsInRange(title, range){
+  const [from, to] = range.split("-");
+  const letter = titleFirstLetter(title);
+  return letter !== null && letter >= from && letter <= to;
 }
 
-// `date` is the Daily's date when dealing a Daily, null otherwise.
-function buildCategoryPool(excludeActors, rng=Math.random, date=null){
-  const pool = [];
-  GENRES.forEach(g => pool.push({type:"genre", label:g, value:g}));
-  DECADES.forEach(d => pool.push({type:"decade", label:`Released in the ${d}s`, value:d}));
-  DIRECTORS.forEach(d => pool.push({type:"director", label:`Directed by ${d}`, value:d}));
-  COLLECTIONS.forEach(c => pool.push({type:"collection", label:c, value:c}));
-  // Only sample a subset of possible co-star candidates — testing all ~180
-  // other actors for a shared credit is too many API calls per deal.
-  const costarCandidates = sample(ACTOR_POOL.filter(a => !excludeActors.includes(a)), 15, rng);
-  costarCandidates.forEach(a =>
-    pool.push({type:"costar", label:`Co-starred with ${a}`, value:a})
-  );
-  // Added after the costars, so for older Dailies the random picks above
-  // (and so the whole grid) come out exactly as they always did.
-  if(!date || date >= TITLE_YEAR_CATEGORIES_FROM){
-    sample(allLetterRanges(), LETTER_RANGES_PER_DEAL, rng)
-      .forEach(v => pool.push(categoryFromTypeAndRaw("startswith", v)));
-    CONTAINS_LETTER_SETS.forEach(v => pool.push(categoryFromTypeAndRaw("contains", v)));
-    sample(allYearRanges(latestRangeYear(date)), YEAR_RANGES_PER_DEAL, rng)
-      .forEach(v => pool.push(categoryFromTypeAndRaw("years", v)));
-  }
-  return pool;
+function titleHasAnyLetter(title, letters){
+  const t = plainTitle(title);
+  return letters.split("").some(ch => t.includes(ch));
+}
+
+function releasedInRange(releaseDate, range){
+  const [from, to] = range.split("-").map(Number);
+  const year = releaseYear(releaseDate);
+  return year !== null && year >= from && year <= to;
+}
+
+function releasedInDecade(releaseDate, decade){
+  const year = releaseYear(releaseDate);
+  return year !== null && Math.floor(year/10)*10 === decade;
 }
 
 function sample(arr, n, rng=Math.random){
@@ -866,120 +845,188 @@ async function prefetchMovieDetails(profile){
   }
 }
 
-// Genre and decade categories are broad enough that we require a real choice
-// of answers, not just one — so a player who doesn't happen to know the one
-// obscure title an actor has in a genre/decade isn't stuck. Director,
-// collection, and costar categories stay at a 1-match minimum: even famous
-// pairings (e.g. Scorsese/DiCaprio) rarely reach 5 shared films, so a 5-match
-// floor there would make those category types almost never dealable.
+// Broad categories (genre, decade, title letters, year ranges) need a real
+// choice of answers, not just one — so a player who doesn't happen to know the
+// one obscure title an actor has in a genre isn't stuck. Director, collection,
+// and costar categories stay at a 1-match minimum: even famous pairings (e.g.
+// Scorsese/DiCaprio) rarely reach 5 shared films, so a 5-match floor there
+// would make those category types almost never dealable.
 const MIN_MATCHES_FOR_BROAD_CATEGORY = 5;
 
-function actorHasGenre(profile, genreId){
-  return profile.credits.filter(m => m.genre_ids.includes(genreId)).length >= MIN_MATCHES_FOR_BROAD_CATEGORY;
-}
-
-function actorHasDecade(profile, decade){
-  return profile.credits.filter(m => {
-    if(!m.release_date) return false;
-    const year = parseInt(m.release_date.slice(0,4));
-    return !isNaN(year) && Math.floor(year/10)*10 === decade;
-  }).length >= MIN_MATCHES_FOR_BROAD_CATEGORY;
-}
-
-async function actorHasDirector(profile, directorName){
-  const target = normalizeName(directorName);
-  await prefetchMovieDetails(profile);
-  for(const m of profile.credits.slice(0, MOVIE_LOOKUP_CAP)){
-    const info = await getMovieDirectorCollection(m.id);
-    if(info.directors.includes(target)) return true;
-  }
-  return false;
-}
-
-async function actorHasCollection(profile, collectionQuery){
-  const q = collectionQuery.toLowerCase();
+// collectionName is TMDb's belongs_to_collection name, lowercased (or null).
+function collectionMatches(collectionName, query){
+  if(!collectionName) return false;
+  const q = query.toLowerCase();
   const qShort = q.split(":")[0].trim();
-  await prefetchMovieDetails(profile);
-  for(const m of profile.credits.slice(0, MOVIE_LOOKUP_CAP)){
-    const info = await getMovieDirectorCollection(m.id);
-    if(info.collection && (info.collection.includes(qShort) || info.collection.includes(q))) return true;
-  }
-  return false;
+  return collectionName.includes(qShort) || collectionName.includes(q);
 }
 
-async function actorsShareCredit(profileA, profileB){
-  if(!profileB.id) return false;
-  const idsB = new Set(profileB.credits.map(m => m.id));
-  return profileA.credits.some(m => idsB.has(m.id));
+// Director/collection need each film's details, so they're only searched
+// among the actor's MOVIE_LOOKUP_CAP most popular films (same limit used to
+// verify solvability). An obscure credit outside that window won't show up in
+// See All, though it's still accepted if you type it in yourself.
+async function cappedMatches(profile, test){
+  await prefetchMovieDetails(profile);
+  const out = [];
+  for(const m of profile.credits.slice(0, MOVIE_LOOKUP_CAP)){
+    if(test(await getMovieDirectorCollection(m.id))) out.push(m);
+  }
+  return out;
+}
+
+// ---------- Category types ----------
+// Everything about a category type lives in its entry here. The dealer,
+// solvability checks, See All, guess checking, Sandbox and share links all
+// read from this table, so adding a type means adding one entry.
+//
+//   name              what Sandbox's type dropdown calls it
+//   label(v)          the column header, e.g. "Directed by Spike Lee"
+//   values({actors})  every allowed value. Share links and saved Dailies are
+//                     checked against it, and it fills Sandbox's dropdown.
+//   optionLabel(v)    how a value reads in that dropdown (default: as is)
+//   fromRaw(raw)      turns a dropdown's string back into a value (default: as is)
+//   dealValues({rng, excludeActors, date})
+//                     the values one deal may try (default: all of values())
+//   dealsFrom         first Daily date this type can appear in (optional)
+//   minMatches        films each actor needs before the category is dealt
+//   capped            only searched among each actor's ~50 most popular films
+//   matches(profile, v)            the actor's credits that fit (may be async)
+//   fitsGuess(details, v, castNames)  whether a submitted film fits; details
+//                     is the /movie/{id} response with credits appended
+//
+// A deal draws its random values in this table's order, so a new type goes at
+// the end. Otherwise every older Daily would come out different.
+const CATEGORY_TYPES = {
+  genre: {
+    name: "Genre",
+    label: v => v,
+    values: () => GENRES,
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => m.genre_ids.includes(genreNameToId[v])),
+    fitsGuess: (details, v) => (details.genres || []).some(g => g.name.toLowerCase() === v.toLowerCase()),
+  },
+  decade: {
+    name: "Decade",
+    label: v => `Released in the ${v}s`,
+    values: () => DECADES,
+    optionLabel: v => `${v}s`,
+    fromRaw: raw => parseInt(raw),
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => releasedInDecade(m.release_date, v)),
+    fitsGuess: (details, v) => releasedInDecade(details.release_date, v),
+  },
+  director: {
+    name: "Director",
+    label: v => `Directed by ${v}`,
+    values: () => DIRECTORS,
+    minMatches: 1,
+    capped: true,
+    matches: (profile, v) => {
+      const target = normalizeName(v);
+      return cappedMatches(profile, info => info.directors.includes(target));
+    },
+    fitsGuess: (details, v) => (details.credits.crew || [])
+      .some(p => p.job === "Director" && normalizeName(p.name) === normalizeName(v)),
+  },
+  collection: {
+    name: "Franchise / collection",
+    label: v => v,
+    values: () => COLLECTIONS,
+    minMatches: 1,
+    capped: true,
+    matches: (profile, v) => cappedMatches(profile, info => collectionMatches(info.collection, v)),
+    fitsGuess: (details, v) =>
+      collectionMatches(details.belongs_to_collection ? details.belongs_to_collection.name.toLowerCase() : null, v),
+  },
+  costar: {
+    name: "Co-star",
+    label: v => `Co-starred with ${v}`,
+    values: ({actors=[]} = {}) => [...ACTOR_POOL].sort().filter(a => !actors.includes(a)),
+    // Only a random 15 per deal: testing all ~180 other actors for a shared
+    // credit is too many API calls.
+    dealValues: ({rng, excludeActors}) => sample(ACTOR_POOL.filter(a => !excludeActors.includes(a)), 15, rng),
+    minMatches: 1,
+    matches: async (profile, v) => {
+      const costar = await getActorProfile(v);
+      const ids = new Set(costar.credits.map(m => m.id));
+      return profile.credits.filter(m => ids.has(m.id));
+    },
+    fitsGuess: (details, v, castNames) => castNames.includes(v.toLowerCase()),
+  },
+  startswith: {
+    name: "Title starts with",
+    label: v => `Title starts with ${dashed(v)}`,
+    values: () => allLetterRanges(),
+    optionLabel: dashed,
+    dealValues: ({rng}) => sample(allLetterRanges(), LETTER_RANGES_PER_DEAL, rng),
+    dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => titleStartsInRange(m.title, v)),
+    fitsGuess: (details, v) => titleStartsInRange(details.title, v),
+  },
+  contains: {
+    name: "Title contains",
+    label: v => `Title contains ${lettersLabel(v)}`,
+    values: () => CONTAINS_LETTER_SETS,
+    optionLabel: lettersLabel,
+    dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => titleHasAnyLetter(m.title, v)),
+    fitsGuess: (details, v) => titleHasAnyLetter(details.title, v),
+  },
+  years: {
+    name: "Release-year range",
+    label: v => `Released ${dashed(v)}`,
+    values: () => allYearRanges(latestRangeYear()).reverse(), // newest first in Sandbox
+    optionLabel: dashed,
+    dealValues: ({rng, date}) => sample(allYearRanges(latestRangeYear(date)), YEAR_RANGES_PER_DEAL, rng),
+    dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => releasedInRange(m.release_date, v)),
+    fitsGuess: (details, v) => releasedInRange(details.release_date, v),
+  },
+};
+
+// Types arrive from share links and storage, so "__proto__" and friends must
+// not resolve to anything.
+function categoryType(type){
+  return Object.prototype.hasOwnProperty.call(CATEGORY_TYPES, type) ? CATEGORY_TYPES[type] : null;
+}
+
+function makeCategory(type, value){
+  return {type, label: CATEGORY_TYPES[type].label(value), value};
+}
+
+function categoryFromTypeAndRaw(type, raw){
+  const def = categoryType(type);
+  return def ? makeCategory(type, def.fromRaw ? def.fromRaw(raw) : raw) : null;
+}
+
+// Every category a deal may try. `date` is the Daily's date when dealing a
+// Daily, null otherwise.
+function buildCategoryPool(excludeActors, rng=Math.random, date=null){
+  const pool = [];
+  for(const [type, def] of Object.entries(CATEGORY_TYPES)){
+    if(def.dealsFrom && date && date < def.dealsFrom) continue;
+    const values = def.dealValues ? def.dealValues({rng, excludeActors, date}) : def.values();
+    values.forEach(v => pool.push(makeCategory(type, v)));
+  }
+  return pool;
 }
 
 async function categoryValidForAll(cat, actorProfiles){
-  if(cat.type === "genre"){
-    const gid = genreNameToId[cat.value];
-    return actorProfiles.every(p => actorHasGenre(p, gid));
+  const def = categoryType(cat.type);
+  if(!def) return false;
+  for(const p of actorProfiles){
+    if((await def.matches(p, cat.value)).length < def.minMatches) return false;
   }
-  if(cat.type === "decade"){
-    return actorProfiles.every(p => actorHasDecade(p, cat.value));
-  }
-  if(cat.type === "director"){
-    for(const p of actorProfiles){ if(!(await actorHasDirector(p, cat.value))) return false; }
-    return true;
-  }
-  if(cat.type === "collection"){
-    for(const p of actorProfiles){ if(!(await actorHasCollection(p, cat.value))) return false; }
-    return true;
-  }
-  if(cat.type === "costar"){
-    const costarProfile = await getActorProfile(cat.value);
-    for(const p of actorProfiles){ if(!(await actorsShareCredit(p, costarProfile))) return false; }
-    return true;
-  }
-  if(TITLE_YEAR_TYPES.includes(cat.type)){
-    return actorProfiles.every(p =>
-      p.credits.filter(m => filmFitsTitleYearCategory(cat, m)).length >= MIN_MATCHES_FOR_BROAD_CATEGORY
-    );
-  }
-  return false;
+  return true;
 }
 
 // ---------- Reveal: every valid answer for one actor x category cell ----------
-// Director/collection matches are only searched among the actor's MOVIE_LOOKUP_CAP
-// most popular films (same limit used to verify solvability), so an obscure credit
-// outside that window won't surface here even though it would still be accepted
-// if you typed it in yourself.
 async function getValidFilms(actorProfile, cat){
-  let matches = [];
-  if(cat.type === "genre"){
-    const gid = genreNameToId[cat.value];
-    matches = actorProfile.credits.filter(m => m.genre_ids.includes(gid));
-  } else if(cat.type === "decade"){
-    matches = actorProfile.credits.filter(m => {
-      if(!m.release_date) return false;
-      const year = parseInt(m.release_date.slice(0,4));
-      return !isNaN(year) && Math.floor(year/10)*10 === cat.value;
-    });
-  } else if(cat.type === "director"){
-    const target = normalizeName(cat.value);
-    await prefetchMovieDetails(actorProfile);
-    for(const m of actorProfile.credits.slice(0, MOVIE_LOOKUP_CAP)){
-      const info = await getMovieDirectorCollection(m.id);
-      if(info.directors.includes(target)) matches.push(m);
-    }
-  } else if(cat.type === "collection"){
-    const q = cat.value.toLowerCase();
-    const qShort = q.split(":")[0].trim();
-    await prefetchMovieDetails(actorProfile);
-    for(const m of actorProfile.credits.slice(0, MOVIE_LOOKUP_CAP)){
-      const info = await getMovieDirectorCollection(m.id);
-      if(info.collection && (info.collection.includes(qShort) || info.collection.includes(q))) matches.push(m);
-    }
-  } else if(cat.type === "costar"){
-    const costarProfile = await getActorProfile(cat.value);
-    const idsB = new Set(costarProfile.credits.map(x => x.id));
-    matches = actorProfile.credits.filter(m => idsB.has(m.id));
-  } else if(TITLE_YEAR_TYPES.includes(cat.type)){
-    matches = actorProfile.credits.filter(m => filmFitsTitleYearCategory(cat, m));
-  }
+  const def = categoryType(cat.type);
+  const matches = def ? await def.matches(actorProfile, cat.value) : [];
   return matches
     .map(m => ({title:m.title, id:m.id, vote_count:m.vote_count, release_date:m.release_date, rarity:rarityScore(m.vote_count)}))
     .sort((a,b) => (b.rarity - a.rarity) || b.title.localeCompare(a.title)); // rarity desc, title desc
@@ -1122,7 +1169,8 @@ const FAQ_ITEMS = [
         least ${MIN_MATCHES_FOR_BROAD_CATEGORY} matching films for that actor, not just one — so you have
         real odds of knowing at least one answer instead of needing to land on a single obscure title.
         Director, franchise/collection, and co-star categories keep a 1-match minimum, since even famous
-        pairings rarely reach ${MIN_MATCHES_FOR_BROAD_CATEGORY} shared films. If a trio of actors can't
+        pairings rarely reach ${MIN_MATCHES_FOR_BROAD_CATEGORY} shared films. A grid also never gets two
+        categories of the same type (no Comedy + Drama, no two co-stars). If a trio of actors can't
         yield 3 solvable categories after enough tries, it resamples a new trio rather than ever showing
         an unsolvable grid. Sandbox mode deliberately bypasses this guarantee, warning you instead if a
         cell has 0 valid answers.`
@@ -1147,7 +1195,7 @@ function openFaqModal(){
 
 el("faqLink").addEventListener("click", e => { e.preventDefault(); openFaqModal(); });
 
-const CAPPED_TYPES = new Set(["director", "collection"]);
+function isCapped(cat){ return !!categoryType(cat.type)?.capped; }
 
 let toastTimer = null;
 function showToast(message, ok=true){
@@ -1224,11 +1272,11 @@ async function openCellSeeAll(r, c){
     const profile = await getActorProfile(actorName);
     const films = await getValidFilms(profile, cat);
     if(!films.length){
-      setModalBody(`<div class="modal-status">No matches found${CAPPED_TYPES.has(cat.type) ? " among this actor's most notable films" : ""}.</div>`);
+      setModalBody(`<div class="modal-status">No matches found${isCapped(cat) ? " among this actor's most notable films" : ""}.</div>`);
       return;
     }
     const yourTitle = cellAnswers[`${r}-${c}`] ? cellAnswers[`${r}-${c}`].title.toLowerCase() : null;
-    const capNote = CAPPED_TYPES.has(cat.type)
+    const capNote = isCapped(cat)
       ? `<div class="modal-note">Searched among this actor's ~${MOVIE_LOOKUP_CAP} most popular films.</div>` : "";
     const sandboxNote = sandboxMode ? `<div class="modal-note">Click a title to copy an API-call snippet for <code>inspect_tmdb.py</code>.</div>` : "";
     const rows = films.map(f => {
@@ -1322,6 +1370,14 @@ function onSeeAllReady(){
 const MAX_ACTOR_ATTEMPTS = 6;   // re-sample the actor trio this many times if needed
 const MAX_DAILY_ACTOR_ATTEMPTS = 20; // the Daily's attempts are fixed by its seed, so allow more before giving up for the day
 const MAX_CATEGORY_CANDIDATES = 60; // give up on this trio after trying this many categories
+// A dealt grid never has two categories of the same type (no Comedy + Drama,
+// no two letter ranges). Dailies before this date were dealt without the rule,
+// so it's left off for them to keep those grids as they were.
+const ONE_CATEGORY_PER_TYPE_FROM = "2026-11-10";
+
+function typeAlreadyUsed(categories, cand){
+  return categories.some(c => c && c.type === cand.type);
+}
 
 // With a seed, every attempt gets its own PRNG seeded from (seed, attempt number),
 // so the picks for attempt N never depend on how many random draws earlier
@@ -1331,6 +1387,7 @@ async function pickSolvablePuzzle(seed=null, dailyDate=null){
   await ensureGenreMap();
 
   const maxAttempts = seed ? MAX_DAILY_ACTOR_ATTEMPTS : MAX_ACTOR_ATTEMPTS;
+  const onePerType = !dailyDate || dailyDate >= ONE_CATEGORY_PER_TYPE_FROM;
   for(let attempt = 0; attempt < maxAttempts; attempt++){
     const rng = seed ? seededRng(`${seed}#${attempt}`) : Math.random;
     const actors = sample(ACTOR_POOL, 3, rng);
@@ -1350,6 +1407,7 @@ async function pickSolvablePuzzle(seed=null, dailyDate=null){
       if(tested >= MAX_CATEGORY_CANDIDATES) break;
       const dup = categories.some(c => c.type === cand.type && c.value === cand.value);
       if(dup) continue;
+      if(onePerType && typeAlreadyUsed(categories, cand)) continue;
       tested++;
       el("statusLine").textContent = `Dealing... testing "${cand.label}" (${categories.length}/3 set)`;
       if(await categoryValidForAll(cand, actorProfiles)) categories.push(cand);
@@ -1480,18 +1538,10 @@ function gridFromSpec(spec){
   for(const pair of spec.c){
     if(!Array.isArray(pair) || pair.length !== 2) return null;
     const [type, value] = pair;
-    const ok =
-      (type === "genre" && GENRES.includes(value)) ||
-      (type === "decade" && DECADES.includes(value)) ||
-      (type === "director" && DIRECTORS.includes(value)) ||
-      (type === "collection" && COLLECTIONS.includes(value)) ||
-      (type === "costar" && ACTOR_POOL.includes(value) && !actors.includes(value)) ||
-      (type === "startswith" && allLetterRanges().includes(value)) ||
-      (type === "contains" && CONTAINS_LETTER_SETS.includes(value)) ||
-      (type === "years" && allYearRanges(latestRangeYear()).includes(value));
-    if(!ok) return null;
+    const def = categoryType(type);
+    if(!def || !def.values({actors}).includes(value)) return null;
     if(categories.some(c => c.type === type && c.value === value)) return null;
-    categories.push(categoryFromTypeAndRaw(type, String(value)));
+    categories.push(makeCategory(type, value));
   }
 
   const date = typeof spec.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(spec.d) && dailyNumber(spec.d) >= 1 ? spec.d : null;
@@ -1908,17 +1958,7 @@ function actorOptionsHtml(){
   return [...ACTOR_POOL].sort().map(a => `<option value="${a}">${a}</option>`).join("");
 }
 
-const CATEGORY_TYPE_OPTIONS = [
-  {value:"genre", label:"Genre"},
-  {value:"decade", label:"Decade"},
-  {value:"director", label:"Director"},
-  {value:"collection", label:"Franchise / collection"},
-  {value:"costar", label:"Co-star"},
-  {value:"startswith", label:"Title starts with"},
-  {value:"contains", label:"Title contains"},
-  {value:"years", label:"Release-year range"}
-];
-
+const CATEGORY_TYPE_OPTIONS = Object.entries(CATEGORY_TYPES).map(([value, def]) => ({value, label: def.name}));
 function renderSandboxGrid(){
   for(let c=0; c<3; c++){
     el("cat"+c).innerHTML = `
@@ -1980,18 +2020,6 @@ function onSandboxActorChange(r){
   refreshSandboxRow(r);
 }
 
-function categoryFromTypeAndRaw(type, raw){
-  if(type === "genre") return {type, label:raw, value:raw};
-  if(type === "decade") return {type, label:`Released in the ${raw}s`, value:parseInt(raw)};
-  if(type === "director") return {type, label:`Directed by ${raw}`, value:raw};
-  if(type === "collection") return {type, label:raw, value:raw};
-  if(type === "costar") return {type, label:`Co-starred with ${raw}`, value:raw};
-  if(type === "startswith") return {type, label:`Title starts with ${raw.replace("-", "–")}`, value:raw};
-  if(type === "contains") return {type, label:`Title contains ${lettersLabel(raw)}`, value:raw};
-  if(type === "years") return {type, label:`Released ${raw.replace("-", "–")}`, value:raw};
-  return null;
-}
-
 function onSandboxCatTypeChange(c){
   const type = el(`catType-${c}`).value;
   const valueSelect = el(`catValue-${c}`);
@@ -2004,15 +2032,8 @@ function onSandboxCatTypeChange(c){
     return;
   }
 
-  let options = [];
-  if(type === "genre") options = GENRES.map(g => ({value:g, label:g}));
-  else if(type === "decade") options = DECADES.map(d => ({value:String(d), label:`${d}s`}));
-  else if(type === "director") options = DIRECTORS.map(d => ({value:d, label:d}));
-  else if(type === "collection") options = COLLECTIONS.map(cName => ({value:cName, label:cName}));
-  else if(type === "costar") options = [...ACTOR_POOL].sort().map(a => ({value:a, label:a}));
-  else if(type === "startswith") options = allLetterRanges().map(v => ({value:v, label:v.replace("-", "–")}));
-  else if(type === "contains") options = CONTAINS_LETTER_SETS.map(v => ({value:v, label:lettersLabel(v)}));
-  else if(type === "years") options = allYearRanges(latestRangeYear()).reverse().map(v => ({value:v, label:v.replace("-", "–")}));
+  const def = categoryType(type);
+  const options = def.values().map(v => ({value:String(v), label: def.optionLabel ? def.optionLabel(v) : String(v)}));
 
   valueSelect.innerHTML = `<option value="">Choose…</option>` + options.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
   valueSelect.style.display = "inline-block";
@@ -2117,6 +2138,8 @@ async function fillInGrid(){
           const cand = shuffled[idx++];
           const dup = puzzle.categories.some(x => x && x.type === cand.type && x.value === cand.value);
           if(dup) continue;
+          // Your own picks can share a type; random fills never add a repeat.
+          if(typeAlreadyUsed(puzzle.categories, cand)) continue;
           if(await categoryValidForAll(cand, actorProfiles)){ chosen = cand; break; }
         }
         puzzle.categories[c] = chosen || shuffled[0];
@@ -2137,7 +2160,7 @@ async function fillInGrid(){
 function syncSandboxCategorySelects(c, cat){
   el(`catType-${c}`).value = cat.type;
   onSandboxCatTypeChange(c); // rebuilds the value <select> options for this type
-  el(`catValue-${c}`).value = cat.type === "decade" ? String(cat.value) : cat.value;
+  el(`catValue-${c}`).value = String(cat.value);
   puzzle.categories[c] = cat; // onSandboxCatTypeChange() clears it above; restore it
 }
 
@@ -2236,24 +2259,8 @@ async function submitGuess(r, c){
       return;
     }
 
-    let catOk = false;
-    if(cat.type === "genre"){
-      catOk = (details.genres || []).some(g => g.name.toLowerCase() === cat.value.toLowerCase());
-    } else if(cat.type === "decade"){
-      const year = details.release_date ? parseInt(details.release_date.slice(0,4)) : null;
-      catOk = year !== null && Math.floor(year/10)*10 === cat.value;
-    } else if(cat.type === "director"){
-      const crew = details.credits.crew || [];
-      catOk = crew.some(p => p.job === "Director" && normalizeName(p.name) === normalizeName(cat.value));
-    } else if(cat.type === "collection"){
-      const collName = details.belongs_to_collection ? details.belongs_to_collection.name.toLowerCase() : "";
-      catOk = collName.includes(cat.value.toLowerCase().split(":")[0].trim().toLowerCase()) ||
-              collName.includes(cat.value.toLowerCase());
-    } else if(cat.type === "costar"){
-      catOk = castNames.includes(cat.value.toLowerCase());
-    } else if(TITLE_YEAR_TYPES.includes(cat.type)){
-      catOk = filmFitsTitleYearCategory(cat, details);
-    }
+    const def = categoryType(cat.type);
+    const catOk = !!def && def.fitsGuess(details, cat.value, castNames);
 
     if(!catOk){
       failEl.textContent = `Correct actor, but that film doesn't satisfy "${cat.label}".`;

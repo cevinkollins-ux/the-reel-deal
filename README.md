@@ -59,7 +59,7 @@ The script needs its own TMDb API key (separate from the one in the browser page
 
 ## Categories
 
-Every category comes from one of eight fixed types, defined near the top of the `<script>` in `index.html`:
+Every category comes from one of eight fixed types. Each type is one entry in the `CATEGORY_TYPES` table in `index.html`, which says everything about it: its label, allowed values, what a deal tries, how matching films are found, and how a guess is checked. To add a type, add an entry at the end of the table (the comment above it lists the fields) with a `dealsFrom` date, so Dailies already in play don't change.
 
 | Type | Example | Source array |
 |---|---|---|
@@ -72,7 +72,7 @@ Every category comes from one of eight fixed types, defined near the top of the 
 | Title contains | "Title contains F, V, W or Y" | `CONTAINS_LETTER_SETS` |
 | Release-year range | "Released 2010–2016" | any 5–10 year span from 1980 to this year (`allYearRanges()`) |
 
-A deal picks 3 categories at random from the combined pool of all eight types (co-star candidates are limited to a random 15 other actors per deal, to keep the solvability check fast; letter and year ranges are limited to 3 of each per deal, so the dozens of possible ranges don't crowd out the other types).
+A deal picks 3 categories at random from the combined pool of all eight types (co-star candidates are limited to a random 15 other actors per deal, to keep the solvability check fast; letter and year ranges are limited to 3 of each per deal, so the dozens of possible ranges don't crowd out the other types). A dealt grid never has two categories of the same type, so no Comedy + Drama and no two co-stars. Dailies follow this rule from 2026-11-10 on (`ONE_CATEGORY_PER_TYPE_FROM`). In Sandbox, your own picks can share a type, but **Fill in grid** never adds a repeat.
 
 - **Title starts with** goes by the letter a title is alphabetized under: a leading "The", "A" or "An" is skipped ("The Matrix" is M), and accents are ignored. A title starting with a number fits no range.
 - **Title contains** checks the whole title, "The" included.
@@ -112,7 +112,7 @@ Before showing a puzzle, it fetches real filmographies for the 3 sampled actors 
 ## Notes / known limitations
 
 - See the Methodology / FAQ above for how rarity is scored, why a film needs at least 1 TMDb vote to count, and why Director/Collection categories only look at an actor's ~50 most popular films.
-- The actor pool (~235 names, all with substantial film work from ~1990 to today) and category pool are hardcoded near the top of the `<script>` in `index.html` — edit the `ACTORS`, `DIRECTORS`, and `COLLECTIONS` arrays to tune who/what shows up.
+- The actor pool (~235 names, all with substantial film work from ~1990 to today) and category pool are hardcoded near the top of the `<script>` in `index.html` — edit the `ACTORS`, `GENRES`, `DIRECTORS`, and `COLLECTIONS` arrays to tune who/what shows up. Changing a list changes the Daily for anyone who hasn't dealt today's yet.
 - An actor's own "See All" (as opposed to a grid box's) isn't affected by the ~50-most-popular-films cap — it lists their complete filmography.
 - Franchise/collection matching is a loose string match against TMDb's `belongs_to_collection` field and can occasionally miss films TMDb doesn't tag into a collection.
 - No award-based categories (e.g. Oscar nominations) since TMDb doesn't track those — would need a separate static dataset to add them.
