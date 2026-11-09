@@ -331,6 +331,46 @@
   .modal-list li.mine{font-weight:700;color:var(--brass);}
   .modal-list li.copyable{cursor:pointer;}
   .modal-list li.copyable:hover{background:#efe4c8;}
+  /* Shared sortable film table used by both "See All" modals. */
+  .film-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
+  .film-table th, .film-table td{padding:5px 6px;border-bottom:1px solid #ece5d3;text-align:left;vertical-align:top;}
+  .film-table th:first-child, .film-table td:first-child{padding-left:0;}
+  .film-table th:last-child, .film-table td:last-child{padding-right:0;}
+  .film-table .num{text-align:right;white-space:nowrap;}
+  .film-table thead th{
+    position:sticky;
+    top:-12px; /* cancels .modal-body's top padding so the header pins flush */
+    background:var(--card);
+    border-bottom:1px solid var(--ledger-line);
+    z-index:1;
+  }
+  .film-table .sort-btn{
+    font-family:inherit;
+    font-size:0.75rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    padding:0;
+    background:transparent;
+    color:#5a5240;
+    border:none;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .film-table .sort-btn:hover{background:transparent;color:var(--brass);}
+  .film-table th[aria-sort] .sort-btn{color:var(--ink);}
+  .film-table .sort-arrow{display:inline-block;width:0.9em;text-align:center;color:var(--brass);}
+  .film-table tr.mine td{font-weight:700;color:var(--brass);}
+  .film-table .mine-tag{font-size:0.7rem;font-weight:400;font-style:italic;margin-left:4px;}
+  .film-table tr.copyable{cursor:pointer;}
+  .film-table tr.copyable:hover td{background:#efe4c8;}
+  .film-table .muted{color:#8a8265;}
+  @media (max-width:520px){
+    .film-table{font-size:0.78rem;}
+    .film-table th, .film-table td{padding:4px 3px;}
+    .film-table .sort-btn{font-size:0.66rem;letter-spacing:0;}
+    .film-table .sort-arrow:empty{width:0;}
+  }
   .toast{
     position:fixed;
     top:18px;
@@ -807,7 +847,8 @@ async function getActorProfile(name){
     .filter(m => isRealFeatureCredit(m.title, m.vote_count, m.video))
     .map(m => ({
       id:m.id, title:m.title, genre_ids:m.genre_ids || [],
-      release_date:m.release_date, popularity:m.popularity || 0, vote_count:m.vote_count || 0
+      release_date:m.release_date, popularity:m.popularity || 0, vote_count:m.vote_count || 0,
+      vote_average:m.vote_average || 0
     }))
     .sort((a,b) => (b.popularity||0) - (a.popularity||0));
   const profile = {id, credits, profilePath};
@@ -1028,7 +1069,7 @@ async function getValidFilms(actorProfile, cat){
   const def = categoryType(cat.type);
   const matches = def ? await def.matches(actorProfile, cat.value) : [];
   return matches
-    .map(m => ({title:m.title, id:m.id, vote_count:m.vote_count, release_date:m.release_date, rarity:rarityScore(m.vote_count)}))
+    .map(m => ({title:m.title, id:m.id, vote_count:m.vote_count, vote_average:m.vote_average, release_date:m.release_date, rarity:rarityScore(m.vote_count)}))
     .sort((a,b) => (b.rarity - a.rarity) || b.title.localeCompare(a.title)); // rarity desc, title desc
 }
 
@@ -1254,20 +1295,104 @@ function fallbackCopy(text){
   }
 }
 
-function wireSandboxCopyableTitles(personId, personName){
-  if(!sandboxMode) return;
-  el("modalBody").querySelectorAll("li[data-movie-id]").forEach(li => {
-    li.classList.add("copyable");
-    li.addEventListener("click", () => {
-      copyToClipboard(buildApiSnippet(personId, personName, li.dataset.movieId, li.dataset.movieTitle));
-    });
+function escapeHtml(text){
+  return String(text).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+
+// ---------- Sortable film table, shared by both "See All" modals ----------
+// Columns are defined once; the cell modal adds a Pts column on top. Number
+// columns sort high-to-low on first click, Title sorts A–Z; clicking the
+// active column again flips it. Films with no value for the sort column
+// (e.g. no release date) always sink to the bottom. Ties fall back to title.
+const FILM_COLUMNS = {
+  title:  {label:"Title",  num:false, value:f => f.title,
+           cell:f => escapeHtml(f.title)},
+  year:   {label:"Year",   num:true,  value:f => f.release_date || null,
+           cell:f => f.release_date ? formatYear(f.release_date) : `<span class="muted">—</span>`},
+  rating: {label:"Rating", num:true,  value:f => f.vote_average || null,
+           cell:f => f.vote_average ? f.vote_average.toFixed(1) : `<span class="muted">—</span>`},
+  votes:  {label:"Votes",  num:true,  value:f => f.vote_count || 0,
+           cell:f => Number(f.vote_count || 0).toLocaleString()},
+  points: {label:"Pts",    num:true,  value:f => 50 + f.rarity,
+           cell:f => 50 + f.rarity},
+};
+
+// Remembers the last sort per modal kind for the rest of the session, so
+// re-opening "See All" keeps the order the player picked.
+const filmTableSort = {
+  actor: {key:"year",   dir:"desc"},
+  cell:  {key:"points", dir:"desc"},
+};
+
+function sortFilms(films, key, dir){
+  const col = FILM_COLUMNS[key];
+  const sign = dir === "asc" ? 1 : -1;
+  return [...films].sort((a, b) => {
+    const av = col.value(a), bv = col.value(b);
+    const aMissing = av == null, bMissing = bv == null;
+    if(aMissing !== bMissing) return aMissing ? 1 : -1;
+    if(!aMissing && av !== bv){
+      const cmp = typeof av === "string" ? av.localeCompare(bv) : av - bv;
+      if(cmp) return cmp * sign;
+    }
+    return a.title.localeCompare(b.title);
   });
 }
+
+// Renders the table into the modal body and wires sorting (and, in Sandbox,
+// click-a-row-to-copy-an-API-snippet).
+function renderFilmTable({films, kind, columns, notesHtml = "", mineTitle = null, personId, personName}){
+  const sort = filmTableSort[kind];
+  const head = columns.map(key => {
+    const col = FILM_COLUMNS[key];
+    return `<th class="${col.num ? "num" : ""}" data-key="${key}"><button type="button" class="sort-btn">${col.label}<span class="sort-arrow"></span></button></th>`;
+  }).join("");
+  setModalBody(`${notesHtml}<table class="film-table"><thead><tr>${head}</tr></thead><tbody></tbody></table>`);
+  const table = el("modalBody").querySelector(".film-table");
+  const tbody = table.querySelector("tbody");
+
+  function draw(){
+    table.querySelectorAll("thead th").forEach(th => {
+      const active = th.dataset.key === sort.key;
+      if(active) th.setAttribute("aria-sort", sort.dir === "asc" ? "ascending" : "descending");
+      else th.removeAttribute("aria-sort");
+      th.querySelector(".sort-arrow").textContent = active ? (sort.dir === "asc" ? "▲" : "▼") : "";
+    });
+    tbody.innerHTML = sortFilms(films, sort.key, sort.dir).map(f => {
+      const mine = mineTitle && f.title.toLowerCase() === mineTitle;
+      const cls = [mine ? "mine" : "", sandboxMode ? "copyable" : ""].join(" ").trim();
+      const cells = columns.map(key => {
+        const col = FILM_COLUMNS[key];
+        const tag = key === "title" && mine ? `<span class="mine-tag">your pick</span>` : "";
+        return `<td class="${col.num ? "num" : ""}">${col.cell(f)}${tag}</td>`;
+      }).join("");
+      return `<tr class="${cls}" data-movie-id="${f.id}" data-movie-title="${escapeHtml(f.title)}">${cells}</tr>`;
+    }).join("");
+  }
+
+  table.querySelector("thead").addEventListener("click", e => {
+    const th = e.target.closest("th[data-key]");
+    if(!th) return;
+    const key = th.dataset.key;
+    if(key === sort.key) sort.dir = sort.dir === "asc" ? "desc" : "asc";
+    else { sort.key = key; sort.dir = FILM_COLUMNS[key].num ? "desc" : "asc"; }
+    draw();
+  });
+  if(sandboxMode){
+    tbody.addEventListener("click", e => {
+      const tr = e.target.closest("tr[data-movie-id]");
+      if(tr) copyToClipboard(buildApiSnippet(personId, personName, tr.dataset.movieId, tr.dataset.movieTitle));
+    });
+  }
+  draw();
+}
+
+const SANDBOX_COPY_NOTE = `<div class="modal-note">Click a title to copy an API-call snippet for <code>inspect_tmdb.py</code>.</div>`;
 
 async function openCellSeeAll(r, c){
   const actorName = puzzle.actors[r];
   const cat = puzzle.categories[c];
-  openModal(`${actorName} — ${cat.label}`, `<div class="modal-status">Loading matches…</div>`);
+  openModal(`${actorName} — ${cat.label}`, `<div class="modal-status">Loading matches…</div>`, true);
   try{
     const profile = await getActorProfile(actorName);
     const films = await getValidFilms(profile, cat);
@@ -1275,17 +1400,16 @@ async function openCellSeeAll(r, c){
       setModalBody(`<div class="modal-status">No matches found${isCapped(cat) ? " among this actor's most notable films" : ""}.</div>`);
       return;
     }
-    const yourTitle = cellAnswers[`${r}-${c}`] ? cellAnswers[`${r}-${c}`].title.toLowerCase() : null;
+    const yourAnswer = cellAnswers[`${r}-${c}`];
     const capNote = isCapped(cat)
       ? `<div class="modal-note">Searched among this actor's ~${MOVIE_LOOKUP_CAP} most popular films.</div>` : "";
-    const sandboxNote = sandboxMode ? `<div class="modal-note">Click a title to copy an API-call snippet for <code>inspect_tmdb.py</code>.</div>` : "";
-    const rows = films.map(f => {
-      const mine = yourTitle && f.title.toLowerCase() === yourTitle;
-      const pts = 50 + f.rarity;
-      return `<li class="${mine ? "mine" : ""}" data-movie-id="${f.id}" data-movie-title="${f.title.replace(/"/g,"&quot;")}">${f.title} (${formatYear(f.release_date)}) — ${pts} pts (${f.rarity} rarity, ${f.vote_count} votes)${mine ? " — your pick" : ""}</li>`;
-    }).join("");
-    setModalBody(`${capNote}${sandboxNote}<ul class="modal-list">${rows}</ul>`);
-    wireSandboxCopyableTitles(profile.id, actorName);
+    renderFilmTable({
+      films, kind:"cell",
+      columns:["title", "year", "rating", "votes", "points"],
+      notesHtml: capNote + (sandboxMode ? SANDBOX_COPY_NOTE : ""),
+      mineTitle: yourAnswer ? yourAnswer.title.toLowerCase() : null,
+      personId: profile.id, personName: actorName,
+    });
   } catch(err){
     setModalBody(`<div class="modal-status">${err.message || "Couldn't load matches."}</div>`);
   }
@@ -1293,25 +1417,19 @@ async function openCellSeeAll(r, c){
 
 async function openActorSeeAll(r){
   const actorName = puzzle.actors[r];
-  openModal(`${actorName} — all films`, `<div class="modal-status">Loading filmography…</div>`);
+  openModal(`${actorName} — all films`, `<div class="modal-status">Loading filmography…</div>`, true);
   try{
     const profile = await getActorProfile(actorName);
     if(!profile.credits.length){
       setModalBody(`<div class="modal-status">No credits found.</div>`);
       return;
     }
-    const films = [...profile.credits].sort((a,b) => {
-      const ad = a.release_date || "0000-00-00";
-      const bd = b.release_date || "0000-00-00";
-      if(ad !== bd) return ad < bd ? 1 : -1; // year/date desc
-      return b.title.localeCompare(a.title); // title desc
+    renderFilmTable({
+      films: profile.credits, kind:"actor",
+      columns:["title", "year", "rating", "votes"],
+      notesHtml: sandboxMode ? SANDBOX_COPY_NOTE : "",
+      personId: profile.id, personName: actorName,
     });
-    const sandboxNote = sandboxMode ? `<div class="modal-note">Click a title to copy an API-call snippet for <code>inspect_tmdb.py</code>.</div>` : "";
-    const rows = films.map(f => {
-      return `<li data-movie-id="${f.id}" data-movie-title="${f.title.replace(/"/g,"&quot;")}">${f.title} (${formatYear(f.release_date)})</li>`;
-    }).join("");
-    setModalBody(`${sandboxNote}<ul class="modal-list">${rows}</ul>`);
-    wireSandboxCopyableTitles(profile.id, actorName);
   } catch(err){
     setModalBody(`<div class="modal-status">${err.message || "Couldn't load filmography."}</div>`);
   }
