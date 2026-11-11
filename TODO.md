@@ -136,3 +136,37 @@ More involved / worth flagging as open questions rather than committing to:
 - **Same release year** (as opposed to decade) — probably too narrow per
   actor to reliably hit the 5-match minimum; would likely need to stay at
   the 1-match floor like director/collection.
+
+## 3. Require well-known films in each category (added 2026-11-11)
+
+Idea: a category is only dealt if each actor has **at least 2 matching films
+with 5,000+ TMDb votes**.
+
+The problem: today the only bar is a match count — 5 films for broad types
+(`MIN_MATCHES_FOR_BROAD_CATEGORY`) and 1 for director, collection and costar
+(`minMatches` on each `CATEGORY_TYPES` entry). An actor can pass with 10
+films in a category that each have 3–50 votes. Nobody has heard of any of
+them, so the square is technically solvable but not fun.
+
+Things to work out:
+
+- **Where to check.** The deal's solvability check already gets each actor's
+  matches from `matches(profile, v)`, and those credits carry `vote_count`.
+  So this can be a second test next to `minMatches`, e.g.
+  `matches.filter(m => m.vote_count >= 5000).length >= 2`. No extra TMDb
+  calls needed.
+- **Thresholds.** 2 films and 5,000 votes are starting guesses. Check some
+  real deals with `inspect_tmdb.py` to see how often categories still get
+  dealt, especially for older or international actors, whose films tend to
+  have fewer TMDb votes. If too few deal, try a lower vote floor
+  (1,000–2,000) or 1 film for director/collection/costar.
+- **Constants.** Name them like the existing ones (e.g.
+  `MIN_WELL_KNOWN_MATCHES`, `WELL_KNOWN_VOTE_COUNT`), or put them on each
+  `CATEGORY_TYPES` entry if types need different values.
+- **Dailies.** This changes which categories get dealt, so it would change
+  Dailies people are already playing. Gate it behind a start date the same
+  way `ONE_CATEGORY_PER_TYPE_FROM` is gated.
+- **Rarity still works.** This only decides whether a category is dealt.
+  Obscure films still count as answers and still score high rarity.
+- **Docs.** Update the FAQ entry on minimum matches (`FAQ_ITEMS`) and the
+  README to match.
