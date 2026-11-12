@@ -1383,12 +1383,9 @@ const FILM_COLUMNS = {
            cell:f => 50 + f.rarity},
 };
 
-// Remembers the last sort per modal kind for the rest of the session, so
-// re-opening "See All" keeps the order the player picked.
-const filmTableSort = {
-  actor: {key:"year",   dir:"desc"},
-  cell:  {key:"points", dir:"desc"},
-};
+// Every "See All" opens sorted by Votes, most first. Clicking a header
+// re-sorts that table only; the next one opens on Votes again.
+const FILM_TABLE_DEFAULT_SORT = {key:"votes", dir:"desc"};
 
 function sortFilms(films, key, dir){
   const col = FILM_COLUMNS[key];
@@ -1408,7 +1405,7 @@ function sortFilms(films, key, dir){
 // Renders the table into the modal body and wires sorting (and, in Sandbox,
 // click-a-row-to-copy-an-API-snippet).
 function renderFilmTable({films, kind, columns, notesHtml = "", mineTitle = null, personId, personName}){
-  const sort = filmTableSort[kind];
+  const sort = {...FILM_TABLE_DEFAULT_SORT};
   const head = columns.map(key => {
     const col = FILM_COLUMNS[key];
     return `<th class="${col.num ? "num" : ""}" data-key="${key}"><button type="button" class="sort-btn">${col.label}<span class="sort-arrow"></span></button></th>`;

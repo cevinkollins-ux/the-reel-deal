@@ -12,8 +12,9 @@ A single-file, browser-based movie trivia grid: 3 actors × 3 categories, and yo
 - A solved cell becomes the film's poster (TMDb's `poster_path`, served from `image.tmdb.org`) with the cell's score badged in the top-right corner. Click the badge for the breakdown: completeness, rarity, and the vote count the rarity came from. If TMDb has no poster on file for that film — or the file 404s — the cell falls back to showing the title.
 - Release years show up everywhere a specific film is named — a solved cell's poster tooltip and points breakdown, the "Used so far" list, and every See All popup — except the autocomplete dropdown while you're still typing (kept minimal there so it stays fast and uncluttered; year only appears there if 2+ results share the exact same title, to disambiguate).
 - **Ready to see answers**: once a puzzle is dealt, click this to reveal a **See All** button on each of the 9 grid boxes and on each of the 3 actors — whether or not you've already answered that cell.
-  - A grid box's **See All** pops up every valid film for that actor × category pairing, sorted by rarity points descending (title descending as a tiebreak), with your own pick marked if you made one — so you can check whether a higher-scoring answer existed.
-  - An actor's **See All** pops up that actor's entire filmography, sorted by release year descending (title descending as a tiebreak) — no category filter, just everything they're credited in.
+  - A grid box's **See All** pops up every valid film for that actor × category pairing, sorted by votes descending, with your own pick marked if you made one — so you can check whether a higher-scoring answer existed.
+  - An actor's **See All** pops up that actor's entire filmography, sorted by votes descending — no category filter, just everything they're credited in.
+  - Both tables open sorted by **Votes**, most first, every time. Click any column header to re-sort that table; click it again to flip the order.
 
 ## Daily puzzle
 
