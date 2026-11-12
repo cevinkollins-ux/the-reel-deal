@@ -894,6 +894,15 @@ async function prefetchMovieDetails(profile){
 // would make those category types almost never dealable.
 const MIN_MATCHES_FOR_BROAD_CATEGORY = 5;
 
+// On top of that, each actor needs a film or two among those matches that
+// plenty of people have actually seen, so no cell is answerable only by deep
+// cuts. One for the 1-match types, two for the broad ones.
+const WELL_KNOWN_VOTE_COUNT = 5000;
+const MIN_WELL_KNOWN_FOR_NARROW_CATEGORY = 1;
+const MIN_WELL_KNOWN_FOR_BROAD_CATEGORY = 2;
+// Dailies before this date were dealt without the well-known-film rule.
+const WELL_KNOWN_RULE_FROM = "2026-11-12";
+
 // collectionName is TMDb's belongs_to_collection name, lowercased (or null).
 function collectionMatches(collectionName, query){
   if(!collectionName) return false;
@@ -930,6 +939,7 @@ async function cappedMatches(profile, test){
 //                     the values one deal may try (default: all of values())
 //   dealsFrom         first Daily date this type can appear in (optional)
 //   minMatches        films each actor needs before the category is dealt
+//   minWellKnown      how many of those need WELL_KNOWN_VOTE_COUNT+ votes
 //   capped            only searched among each actor's ~50 most popular films
 //   matches(profile, v)            the actor's credits that fit (may be async)
 //   fitsGuess(details, v, castNames)  whether a submitted film fits; details
@@ -943,6 +953,7 @@ const CATEGORY_TYPES = {
     label: v => v,
     values: () => GENRES,
     minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
     matches: (profile, v) => profile.credits.filter(m => m.genre_ids.includes(genreNameToId[v])),
     fitsGuess: (details, v) => (details.genres || []).some(g => g.name.toLowerCase() === v.toLowerCase()),
   },
@@ -953,6 +964,7 @@ const CATEGORY_TYPES = {
     optionLabel: v => `${v}s`,
     fromRaw: raw => parseInt(raw),
     minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
     matches: (profile, v) => profile.credits.filter(m => releasedInDecade(m.release_date, v)),
     fitsGuess: (details, v) => releasedInDecade(details.release_date, v),
   },
@@ -961,6 +973,7 @@ const CATEGORY_TYPES = {
     label: v => `Directed by ${v}`,
     values: () => DIRECTORS,
     minMatches: 1,
+    minWellKnown: MIN_WELL_KNOWN_FOR_NARROW_CATEGORY,
     capped: true,
     matches: (profile, v) => {
       const target = normalizeName(v);
@@ -974,6 +987,7 @@ const CATEGORY_TYPES = {
     label: v => v,
     values: () => COLLECTIONS,
     minMatches: 1,
+    minWellKnown: MIN_WELL_KNOWN_FOR_NARROW_CATEGORY,
     capped: true,
     matches: (profile, v) => cappedMatches(profile, info => collectionMatches(info.collection, v)),
     fitsGuess: (details, v) =>
@@ -987,6 +1001,7 @@ const CATEGORY_TYPES = {
     // credit is too many API calls.
     dealValues: ({rng, excludeActors}) => sample(ACTOR_POOL.filter(a => !excludeActors.includes(a)), 15, rng),
     minMatches: 1,
+    minWellKnown: MIN_WELL_KNOWN_FOR_NARROW_CATEGORY,
     matches: async (profile, v) => {
       const costar = await getActorProfile(v);
       const ids = new Set(costar.credits.map(m => m.id));
@@ -1002,6 +1017,7 @@ const CATEGORY_TYPES = {
     dealValues: ({rng}) => sample(allLetterRanges(), LETTER_RANGES_PER_DEAL, rng),
     dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
     minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
     matches: (profile, v) => profile.credits.filter(m => titleStartsInRange(m.title, v)),
     fitsGuess: (details, v) => titleStartsInRange(details.title, v),
   },
@@ -1012,6 +1028,7 @@ const CATEGORY_TYPES = {
     optionLabel: lettersLabel,
     dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
     minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
     matches: (profile, v) => profile.credits.filter(m => titleHasAnyLetter(m.title, v)),
     fitsGuess: (details, v) => titleHasAnyLetter(details.title, v),
   },
@@ -1023,6 +1040,7 @@ const CATEGORY_TYPES = {
     dealValues: ({rng, date}) => sample(allYearRanges(latestRangeYear(date)), YEAR_RANGES_PER_DEAL, rng),
     dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
     minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
     matches: (profile, v) => profile.credits.filter(m => releasedInRange(m.release_date, v)),
     fitsGuess: (details, v) => releasedInRange(details.release_date, v),
   },
@@ -1055,11 +1073,15 @@ function buildCategoryPool(excludeActors, rng=Math.random, date=null){
   return pool;
 }
 
-async function categoryValidForAll(cat, actorProfiles){
+// requireWellKnown is off only for Dailies dealt before WELL_KNOWN_RULE_FROM.
+async function categoryValidForAll(cat, actorProfiles, requireWellKnown=true){
   const def = categoryType(cat.type);
   if(!def) return false;
   for(const p of actorProfiles){
-    if((await def.matches(p, cat.value)).length < def.minMatches) return false;
+    const found = await def.matches(p, cat.value);
+    if(found.length < def.minMatches) return false;
+    if(requireWellKnown &&
+       found.filter(m => (m.vote_count || 0) >= WELL_KNOWN_VOTE_COUNT).length < def.minWellKnown) return false;
   }
   return true;
 }
@@ -1210,7 +1232,10 @@ const FAQ_ITEMS = [
         least ${MIN_MATCHES_FOR_BROAD_CATEGORY} matching films for that actor, not just one — so you have
         real odds of knowing at least one answer instead of needing to land on a single obscure title.
         Director, franchise/collection, and co-star categories keep a 1-match minimum, since even famous
-        pairings rarely reach ${MIN_MATCHES_FOR_BROAD_CATEGORY} shared films. A grid also never gets two
+        pairings rarely reach ${MIN_MATCHES_FOR_BROAD_CATEGORY} shared films. Each actor also needs at least
+        ${MIN_WELL_KNOWN_FOR_NARROW_CATEGORY} well-known matching film (${WELL_KNOWN_VOTE_COUNT.toLocaleString()}+ TMDb votes)
+        for those, and ${MIN_WELL_KNOWN_FOR_BROAD_CATEGORY} for the broad ones, so no cell can be answered only with
+        deep cuts. A grid also never gets two
         categories of the same type (no Comedy + Drama, no two co-stars). If a trio of actors can't
         yield 3 solvable categories after enough tries, it resamples a new trio rather than ever showing
         an unsolvable grid. Sandbox mode deliberately bypasses this guarantee, warning you instead if a
@@ -1506,6 +1531,7 @@ async function pickSolvablePuzzle(seed=null, dailyDate=null){
 
   const maxAttempts = seed ? MAX_DAILY_ACTOR_ATTEMPTS : MAX_ACTOR_ATTEMPTS;
   const onePerType = !dailyDate || dailyDate >= ONE_CATEGORY_PER_TYPE_FROM;
+  const requireWellKnown = !dailyDate || dailyDate >= WELL_KNOWN_RULE_FROM;
   for(let attempt = 0; attempt < maxAttempts; attempt++){
     const rng = seed ? seededRng(`${seed}#${attempt}`) : Math.random;
     const actors = sample(ACTOR_POOL, 3, rng);
@@ -1528,7 +1554,7 @@ async function pickSolvablePuzzle(seed=null, dailyDate=null){
       if(onePerType && typeAlreadyUsed(categories, cand)) continue;
       tested++;
       el("statusLine").textContent = `Dealing... testing "${cand.label}" (${categories.length}/3 set)`;
-      if(await categoryValidForAll(cand, actorProfiles)) categories.push(cand);
+      if(await categoryValidForAll(cand, actorProfiles, requireWellKnown)) categories.push(cand);
     }
 
     if(categories.length === 3) return {actors, categories};
