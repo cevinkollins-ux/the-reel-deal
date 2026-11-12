@@ -74,7 +74,7 @@ Every category comes from one of eight fixed types. Each type is one entry in th
 
 A deal picks 3 categories at random from the combined pool of all eight types (co-star candidates are limited to a random 15 other actors per deal, to keep the solvability check fast; letter and year ranges are limited to 3 of each per deal, so the dozens of possible ranges don't crowd out the other types). A dealt grid never has two categories of the same type, so no Comedy + Drama and no two co-stars. Dailies follow this rule from 2026-11-10 on (`ONE_CATEGORY_PER_TYPE_FROM`). In Sandbox, your own picks can share a type, but **Fill in grid** never adds a repeat.
 
-- **Title starts with** goes by the letter a title is alphabetized under: a leading "The", "A" or "An" is skipped ("The Matrix" is M), and accents are ignored. A title starting with a number fits no range.
+- **Title starts with** goes by a title's first letter, accents ignored. Each letter range is dealt with a random article rule, and the label always names it: "Title starts with P–Z" counts "The Big Short" as T; `(ignore "The")` skips a leading "The"; `(ignore "A/An")` skips a leading "A" or "An"; `(ignore articles)` skips all three. A title starting with a number fits no range. Dailies before 2026-11-12 (`ARTICLE_MODES_FROM`) always ignore articles, and now say so.
 - **Title contains** checks the whole title, "The" included.
 - **Release-year ranges** include both end years. A range that's exactly a decade (e.g. 2010–2019) is left out, since Decade covers it.
 - Like Genre and Decade, these three need at least 5 matching films per actor before they're dealt. They use only a film's title and release date, so they cost no extra TMDb calls.

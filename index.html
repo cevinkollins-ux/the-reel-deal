@@ -564,6 +564,22 @@ const YEAR_RANGES_PER_DEAL = 3;
 // out for earlier dates keeps those Dailies the same for anyone still on one.
 const TITLE_YEAR_CATEGORIES_FROM = "2026-11-09";
 
+// Which leading words "Title starts with" skips. A value is a letter range
+// plus an optional mode: "B-J:none", "B-J:the", "B-J:a". A bare "B-J" skips
+// all three articles. That's how every letter range worked before the modes
+// existed, so older Dailies, saved games and share links keep their meaning.
+// The label always says which mode applies.
+const ARTICLE_MODES = {
+  none:     {suffix: ":none", note: "",                   strip: null},
+  the:      {suffix: ":the",  note: ' (ignore "The")',    strip: /^THE\s+/},
+  a:        {suffix: ":a",    note: ' (ignore "A/An")',   strip: /^(AN|A)\s+/},
+  articles: {suffix: "",      note: " (ignore articles)", strip: /^(THE|AN|A)\s+/},
+};
+const ARTICLE_MODE_ORDER = ["none", "the", "a", "articles"];
+// Dailies from this date on deal a random mode per letter range. Earlier ones
+// keep their bare (ignore-articles) values, so they come out as they were.
+const ARTICLE_MODES_FROM = "2026-11-12";
+
 function allLetterRanges(){ // ["A-G", "A-H", ..., "T-Z"]
   const out = [];
   for(let i=0; i<ALPHABET.length; i++){
@@ -590,6 +606,24 @@ function allYearRanges(latest){ // ["1980-1984", ..., "2017-2026"]
   return out;
 }
 
+function letterRangeValue(range, mode){ return range + ARTICLE_MODES[mode].suffix; }
+
+// "B-J:the" -> {range:"B-J", mode:"the"}; "B-J" -> {range:"B-J", mode:"articles"}.
+function parseLetterRangeValue(value){
+  const [range, tag] = value.split(":");
+  const mode = tag === undefined ? "articles" : ARTICLE_MODE_ORDER.find(m => ARTICLE_MODES[m].suffix === ":" + tag);
+  return {range, mode: mode || "articles"};
+}
+
+function allLetterRangeValues(){ // ["A-G:none", "A-G:the", "A-G:a", "A-G", ...]
+  return allLetterRanges().flatMap(r => ARTICLE_MODE_ORDER.map(m => letterRangeValue(r, m)));
+}
+
+function letterRangeLabel(value){ // "B-J:the" -> 'B–J (ignore "The")'
+  const {range, mode} = parseLetterRangeValue(value);
+  return dashed(range) + ARTICLE_MODES[mode].note;
+}
+
 function lettersLabel(letters){ // "FVWY" -> "F, V, W or Y"
   const chars = letters.split("");
   return chars.length > 1 ? chars.slice(0,-1).join(", ") + " or " + chars[chars.length-1] : letters;
@@ -600,14 +634,14 @@ function plainTitle(title){
   return (title || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
 }
 
-// The letter a title is alphabetized under: leading punctuation and a leading
-// The/A/An are skipped, so "The Matrix" is M. A title that starts with a digit
+// The letter a title starts with once leading punctuation, and whichever
+// leading article the mode skips, are dropped: with "articles", "The Matrix"
+// is M; with "none" it's T. A title that starts with a digit
 // ("10 Cloverfield Lane") has no letter and fits no range.
-function titleFirstLetter(title){
-  const t = plainTitle(title)
-    .replace(/^[^A-Z0-9]+/, "")
-    .replace(/^(THE|AN|A)\s+/, "")
-    .replace(/^[^A-Z0-9]+/, "");
+function titleFirstLetter(title, mode="articles"){
+  let t = plainTitle(title).replace(/^[^A-Z0-9]+/, "");
+  const strip = ARTICLE_MODES[mode].strip;
+  if(strip) t = t.replace(strip, "").replace(/^[^A-Z0-9]+/, "");
   return /^[A-Z]/.test(t) ? t[0] : null;
 }
 
@@ -618,9 +652,10 @@ function releaseYear(releaseDate){
 
 function dashed(range){ return range.replace("-", "–"); } // "D-M" -> "D–M"
 
-function titleStartsInRange(title, range){
+function titleStartsInRange(title, value){
+  const {range, mode} = parseLetterRangeValue(value);
   const [from, to] = range.split("-");
-  const letter = titleFirstLetter(title);
+  const letter = titleFirstLetter(title, mode);
   return letter !== null && letter >= from && letter <= to;
 }
 
@@ -1011,10 +1046,14 @@ const CATEGORY_TYPES = {
   },
   startswith: {
     name: "Title starts with",
-    label: v => `Title starts with ${dashed(v)}`,
-    values: () => allLetterRanges(),
-    optionLabel: dashed,
-    dealValues: ({rng}) => sample(allLetterRanges(), LETTER_RANGES_PER_DEAL, rng),
+    label: v => `Title starts with ${letterRangeLabel(v)}`,
+    values: () => allLetterRangeValues(),
+    optionLabel: letterRangeLabel,
+    dealValues: ({rng, date}) => {
+      const ranges = sample(allLetterRanges(), LETTER_RANGES_PER_DEAL, rng);
+      if(date && date < ARTICLE_MODES_FROM) return ranges; // bare = ignore articles, as dealt then
+      return ranges.map(r => letterRangeValue(r, ARTICLE_MODE_ORDER[Math.floor(rng() * ARTICLE_MODE_ORDER.length)]));
+    },
     dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
     minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
     minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
@@ -1217,9 +1256,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "How do the title-letter and year-range categories work?",
-    a: `<b>Title starts with</b> (e.g. "D–M") goes by the letter a title is alphabetized under: a
-        leading "The", "A" or "An" is skipped, so "The Matrix" counts as M, and accents are ignored. A
-        title that starts with a number ("10 Cloverfield Lane") doesn't fit any letter range.
+    a: `<b>Title starts with</b> (e.g. "D–M") goes by a title's first letter, accents ignored. The
+        category says whether a leading article is skipped: plain "D–M" counts "The Matrix" as T;
+        <i>(ignore "The")</i> skips a leading "The" so it counts as M; <i>(ignore "A/An")</i> skips a leading
+        "A" or "An"; <i>(ignore articles)</i> skips all three. A title that starts with a number
+        ("10 Cloverfield Lane") doesn't fit any letter range.
         <b>Title contains F, V, W or Y</b> checks the whole title, "The" included, for any one of those
         letters. <b>Released</b> ranges (e.g. "Released 2010–2016") include both end years. All three
         go by TMDb's English title and release date.`
