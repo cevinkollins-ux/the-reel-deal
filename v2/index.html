@@ -1,0 +1,2490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Reel Deal</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20140%22%3E%20%3Crect%20x%3D%226%22%20y%3D%226%22%20width%3D%2288%22%20height%3D%22128%22%20rx%3D%2212%22%20fill%3D%22%23f7f3e8%22%20stroke%3D%22%23211d16%22%20stroke-width%3D%225%22/%3E%20%3Cg%20stroke%3D%22%23a8792f%22%20stroke-width%3D%223%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%20%3Cellipse%20cx%3D%2227%22%20cy%3D%2231%22%20rx%3D%2215%22%20ry%3D%2217%22/%3E%20%3Ccircle%20cx%3D%2221%22%20cy%3D%2226%22%20r%3D%221.8%22%20fill%3D%22%23a8792f%22%20stroke%3D%22none%22/%3E%20%3Ccircle%20cx%3D%2233%22%20cy%3D%2226%22%20r%3D%221.8%22%20fill%3D%22%23a8792f%22%20stroke%3D%22none%22/%3E%20%3Cpath%20d%3D%22M%2019%2035%20Q%2027%2044%2035%2035%22/%3E%20%3C/g%3E%20%3Cg%20stroke%3D%22%238c3b2e%22%20stroke-width%3D%223%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%20%3Cellipse%20cx%3D%2273%22%20cy%3D%22109%22%20rx%3D%2215%22%20ry%3D%2217%22/%3E%20%3Ccircle%20cx%3D%2267%22%20cy%3D%22104%22%20r%3D%221.8%22%20fill%3D%22%238c3b2e%22%20stroke%3D%22none%22/%3E%20%3Ccircle%20cx%3D%2279%22%20cy%3D%22104%22%20r%3D%221.8%22%20fill%3D%22%238c3b2e%22%20stroke%3D%22none%22/%3E%20%3Cpath%20d%3D%22M%2065%20115%20Q%2073%20108%2081%20115%22/%3E%20%3C/g%3E%20%3C/svg%3E">
+<style>
+  :root{
+    --paper:#efe9dc;
+    --ink:#211d16;
+    --ledger-line:#c9bfa5;
+    --gold:#a8792f;
+    --brass:#8a6a2f;
+    --correct:#3f5d3a;
+    --correct-bg:#e2ead9;
+    --wrong:#8c3b2e;
+    --wrong-bg:#f3ddd6;
+    --card:#f7f3e8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image:
+      repeating-linear-gradient(180deg, transparent 0, transparent 34px, var(--ledger-line) 35px);
+    color:var(--ink);
+    font-family: "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  .wrap{max-width:820px;margin:0 auto;}
+  header{
+    text-align:left;
+    border-bottom:3px double var(--ink);
+    padding-bottom:14px;
+    margin-bottom:22px;
+  }
+  h1{
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight:700;
+    font-style:italic;
+    font-size:2.1rem;
+    margin:0 0 4px;
+    letter-spacing:0.3px;
+  }
+  .sub{
+    font-size:0.95rem;
+    color:#5a5240;
+    max-width:60ch;
+    line-height:1.5;
+  }
+  .setup{
+    background:var(--card);
+    border:1px solid var(--ledger-line);
+    padding:16px 18px;
+    margin-bottom:22px;
+  }
+  .setup label{display:block;font-size:0.85rem;margin-bottom:6px;color:#5a5240;}
+  .setup .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  input[type=password], input[type=text]{
+    font-family:inherit;
+    font-size:0.95rem;
+    padding:8px 10px;
+    border:1px solid var(--ledger-line);
+    background:#fff;
+    min-width:220px;
+    flex:1;
+  }
+  button{
+    font-family:inherit;
+    font-size:0.9rem;
+    padding:9px 16px;
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    cursor:pointer;
+  }
+  button:hover{background:#3a3323;}
+  button.secondary{
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--ink);
+  }
+  button.secondary:hover{background:rgba(0,0,0,0.06);}
+  button:disabled{opacity:0.4;cursor:not-allowed;}
+  .status-line{font-size:0.85rem;color:#5a5240;margin-top:8px;min-height:1.2em;}
+  .sandbox-toggle{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:0.85rem;
+    color:#5a5240;
+    cursor:pointer;
+  }
+  .sandbox-toggle input{cursor:pointer;}
+
+  .scoreboard{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px 16px;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:14px;
+  }
+  .scoreboard .total{font-size:1.6rem;font-weight:700;}
+  .scoreboard .label{font-size:0.8rem;color:#5a5240;}
+  .scoreboard-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+  .grid-info{font-size:0.82rem;color:#5a5240;margin:-6px 0 10px;min-height:1em;}
+  .grid-info strong{color:var(--ink);}
+  .grid-info .grid-code{font-family:Menlo,Consolas,monospace;background:#e4dcc7;padding:1px 5px;letter-spacing:1px;}
+  .grid-info .grid-hint{font-style:italic;color:#8a8265;}
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    background:var(--card);
+    table-layout:fixed;
+  }
+  table.grid th, table.grid td{
+    border:1px solid var(--ledger-line);
+    padding:10px;
+    vertical-align:top;
+    text-align:left;
+  }
+  table.grid th{
+    background:#e4dcc7;
+    font-weight:700;
+    font-size:0.92rem;
+  }
+  table.grid th.corner{background:var(--paper);border:none;}
+  td.cell{width:33%;height:120px;position:relative;}
+  .cell input{
+    width:100%;
+    min-width:0; /* override the global 220px input minimum so it fits its cell */
+    font-size:0.88rem;
+    padding:6px 7px;
+    border:1px solid var(--ledger-line);
+    background:#fff;
+  }
+  .cell .go{
+    margin-top:6px;
+    font-size:0.78rem;
+    padding:5px 10px;
+  }
+  .ac-wrap{position:relative;}
+  .ac-list{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    background:#fff;
+    border:1px solid var(--ledger-line);
+    max-height:160px;
+    overflow-y:auto;
+    z-index:30;
+    list-style:none;
+    margin:2px 0 0;
+    padding:0;
+    display:none;
+    box-shadow:0 3px 6px rgba(0,0,0,0.15);
+  }
+  .ac-list li{
+    padding:6px 8px;
+    font-size:0.8rem;
+    cursor:pointer;
+    border-bottom:1px solid #ece5d3;
+  }
+  .ac-list li:last-child{border-bottom:none;}
+  .ac-list li:hover, .ac-list li.active{background:#e4dcc7;}
+  .cell.correct{background:var(--correct-bg);}
+  .cell.wrong-flash{background:var(--wrong-bg);}
+  .answer{
+    font-size:0.85rem;
+    line-height:1.35;
+    position:relative;
+  }
+  /* Shown instead of the poster when TMDb has none on file, or the file 404s. */
+  .answer .movie-title{
+    display:block;
+    font-weight:700;
+    color:var(--correct);
+    /* Start below the badge rather than beside it — a narrow cell has no room
+       to the left of the badge, and a long word would run under it. */
+    padding-top:24px;
+  }
+  /* The poster is the payoff for solving a cell. Width leads (so a narrow cell
+     shrinks the poster rather than letterboxing it) and the 2:3 ratio is
+     declared up front, so the row grows once on solve rather than jumping again
+     when the file arrives. object-fit covers the few posters TMDb holds at some
+     other ratio. */
+  .answer .poster{
+    display:block;
+    width:113px;
+    max-width:100%;
+    height:auto;
+    aspect-ratio:2/3;
+    object-fit:contain;
+    background:#e4dcc7;
+    border:1px solid var(--ledger-line);
+  }
+  /* The score sits in the corner as a badge; clicking it breaks the number down. */
+  .pts-btn{
+    position:absolute;
+    top:0;
+    right:0;
+    font-family:inherit;
+    font-size:0.72rem;
+    font-weight:700;
+    line-height:1.2;
+    padding:3px 6px;
+    background:var(--card);
+    color:var(--correct);
+    border:1px solid var(--correct);
+    cursor:pointer;
+  }
+  .pts-btn:hover{background:var(--correct);color:var(--card);}
+  .points-breakdown .line{font-size:0.9rem;padding:3px 0;}
+  .points-breakdown .total{
+    font-size:1.1rem;
+    font-weight:700;
+    color:var(--correct);
+    border-top:1px solid var(--ledger-line);
+    margin-top:6px;
+    padding-top:6px;
+  }
+  .points-breakdown .note{font-size:0.78rem;color:#8a8265;margin-top:10px;line-height:1.5;}
+  .fail-msg{
+    font-size:0.78rem;
+    color:var(--wrong);
+    margin-top:5px;
+    min-height:1em;
+  }
+  .used-list{
+    margin-top:26px;
+    font-size:0.8rem;
+    color:#5a5240;
+  }
+  th .actor-name{margin-bottom:4px;}
+  /* The actor name doubles as a button that opens the headshot modal — styled
+     to read as the plain bold row label it replaced, with a dotted underline
+     as the only hint that it's clickable. */
+  .actor-name-btn{
+    font-family:inherit;
+    font-size:inherit;
+    font-weight:inherit;
+    line-height:inherit;
+    text-align:left;
+    padding:0;
+    background:transparent;
+    color:var(--ink);
+    border:none;
+    border-bottom:1px dotted #8a8265;
+    cursor:pointer;
+  }
+  .actor-name-btn:hover{background:transparent;color:var(--brass);border-bottom-color:var(--brass);}
+  .headshot{text-align:center;}
+  .headshot img{
+    width:100%;
+    max-width:240px;
+    display:block;
+    margin:0 auto;
+    border:1px solid var(--ledger-line);
+  }
+  .headshot .credit{font-size:0.72rem;color:#8a8265;margin-top:8px;}
+  .see-all-btn{
+    font-size:0.72rem;
+    padding:3px 9px;
+  }
+  .see-all-wrap{margin-top:6px;}
+  .actor-select, .sandbox-cat select{
+    font-family:inherit;
+    font-size:0.8rem;
+    padding:4px 6px;
+    border:1px solid var(--ledger-line);
+    background:#fff;
+    width:100%;
+  }
+  .sandbox-cat select + select{margin-top:4px;}
+  .sandbox-hint{font-size:0.78rem;color:#8a8265;font-style:italic;}
+  .sandbox-count{font-size:0.88rem;font-weight:700;margin-bottom:6px;}
+  .sandbox-count.zero{color:var(--wrong);}
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(33,29,22,0.55);
+    z-index:100;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .modal-box{
+    background:var(--card);
+    border:1px solid var(--ledger-line);
+    max-width:480px;
+    width:100%;
+    max-height:80vh;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);
+  }
+  .modal-box.wide{max-width:640px;}
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:12px 16px;
+    border-bottom:1px solid var(--ledger-line);
+    font-weight:700;
+  }
+  .modal-close-btn{
+    padding:3px 9px;
+    font-size:0.85rem;
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--ink);
+  }
+  .modal-body{
+    padding:12px 16px;
+    overflow-y:auto;
+    font-size:0.85rem;
+  }
+  .modal-status{color:#5a5240;font-style:italic;}
+  .modal-note{color:#8a8265;font-size:0.75rem;margin-bottom:8px;}
+  .modal-note code{background:#e4dcc7;padding:1px 4px;}
+  .modal-list{list-style:none;margin:0;padding:0;}
+  .modal-list li{padding:4px 0;border-bottom:1px solid #ece5d3;}
+  .modal-list li:last-child{border-bottom:none;}
+  .modal-list li.mine{font-weight:700;color:var(--brass);}
+  .modal-list li.copyable{cursor:pointer;}
+  .modal-list li.copyable:hover{background:#efe4c8;}
+  /* Shared sortable film table used by both "See All" modals. */
+  .film-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
+  .film-table th, .film-table td{padding:5px 6px;border-bottom:1px solid #ece5d3;text-align:left;vertical-align:top;}
+  .film-table th:first-child, .film-table td:first-child{padding-left:0;}
+  .film-table th:last-child, .film-table td:last-child{padding-right:0;}
+  .film-table .num{text-align:right;white-space:nowrap;}
+  .film-table thead th{
+    position:sticky;
+    top:-12px; /* cancels .modal-body's top padding so the header pins flush */
+    background:var(--card);
+    border-bottom:1px solid var(--ledger-line);
+    z-index:1;
+  }
+  .film-table .sort-btn{
+    font-family:inherit;
+    font-size:0.75rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    padding:0;
+    background:transparent;
+    color:#5a5240;
+    border:none;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .film-table .sort-btn:hover{background:transparent;color:var(--brass);}
+  .film-table th[aria-sort] .sort-btn{color:var(--ink);}
+  .film-table .sort-arrow{display:inline-block;width:0.9em;text-align:center;color:var(--brass);}
+  .film-table tr.mine td{font-weight:700;color:var(--brass);}
+  .film-table .mine-tag{font-size:0.7rem;font-weight:400;font-style:italic;margin-left:4px;}
+  .film-table tr.copyable{cursor:pointer;}
+  .film-table tr.copyable:hover td{background:#efe4c8;}
+  .film-table .muted{color:#8a8265;}
+  @media (max-width:520px){
+    .film-table{font-size:0.78rem;}
+    .film-table th, .film-table td{padding:4px 3px;}
+    .film-table .sort-btn{font-size:0.66rem;letter-spacing:0;}
+    .film-table .sort-arrow:empty{width:0;}
+  }
+  .toast{
+    position:fixed;
+    top:18px;
+    left:50%;
+    transform:translateX(-50%) translateY(-8px);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--ink);
+    color:var(--paper);
+    padding:10px 18px;
+    font-size:0.85rem;
+    border-radius:3px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.3);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.25s ease, transform 0.25s ease;
+    z-index:200;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast .toast-icon{color:#7fce90; font-weight:700;}
+  .toast.warn .toast-icon{color:#e0a05a;}
+  footer{
+    margin-top:30px;
+    font-size:0.75rem;
+    color:#7a7259;
+    text-align:center;
+  }
+  .faq-link{
+    display:inline-block;
+    margin-top:6px;
+    color:var(--brass);
+    text-decoration:underline;
+    cursor:pointer;
+  }
+  .faq-item{margin-bottom:14px;}
+  .faq-item:last-child{margin-bottom:0;}
+  .faq-q{font-weight:700;margin-bottom:3px;}
+  .faq-a{color:#4a4536;line-height:1.4;}
+  .faq-a code{background:#e4dcc7;padding:1px 4px;}
+  @media (max-width:640px){
+    table.grid th, table.grid td{padding:6px;font-size:0.8rem;}
+    td.cell{height:140px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>The Reel Deal</h1>
+    <div class="sub">A movie trivia grid. Name a film linking each actor to each category — full marks for a valid answer, extra credit for pulling something obscure. Play today's Daily against your friends, or deal a fresh grid any time.</div>
+  </header>
+
+  <div class="setup">
+    <label for="apiKey">TMDb API key (v3 auth, kept only in this browser)</label>
+    <div class="row">
+      <input type="password" id="apiKey" placeholder="Paste your TMDb API key">
+      <button id="saveKey">Save key</button>
+      <button id="dailyPuzzle" disabled>Today's Daily</button>
+      <button id="newPuzzle" class="secondary" disabled>Deal a new puzzle</button>
+      <label class="sandbox-toggle"><input type="checkbox" id="sandboxToggle" disabled> Sandbox mode</label>
+    </div>
+    <div class="status-line" id="statusLine">Get a free key at themoviedb.org → Settings → API, then paste it above.</div>
+  </div>
+
+  <div id="game" style="display:none;">
+    <div class="scoreboard" id="scoreboard">
+      <div><span class="total" id="totalScore">0</span> <span class="label">pts</span></div>
+      <div class="label" id="filledCount">0 / 9 filled</div>
+      <div class="scoreboard-actions">
+        <button id="shareGridBtn" class="secondary" disabled>Share grid</button>
+        <button id="seeAllReadyBtn" class="secondary" disabled>Ready to see answers</button>
+      </div>
+    </div>
+    <div class="grid-info" id="gridInfo"></div>
+    <div class="scoreboard" id="sandboxBar" style="display:none;">
+      <div class="label">Sandbox mode — set actors &amp; categories below, or click "Fill in grid" to finish automatically.</div>
+      <button id="fillInGridBtn" class="secondary">Fill in grid</button>
+    </div>
+    <table class="grid">
+      <thead>
+        <tr>
+          <th class="corner"></th>
+          <th id="cat0"></th>
+          <th id="cat1"></th>
+          <th id="cat2"></th>
+        </tr>
+      </thead>
+      <tbody id="gridBody"></tbody>
+    </table>
+    <div class="used-list" id="usedList"></div>
+  </div>
+
+  <footer>
+    Data from TMDb. Rarity score is based on TMDb's vote count for the film you name, not IMDb's.
+    <div><a href="#" id="faqLink" class="faq-link">Methodology &amp; FAQ</a></div>
+  </footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box" id="modalBox">
+    <div class="modal-header">
+      <span id="modalTitle"></span>
+      <button id="modalClose" class="modal-close-btn">Close</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const TMDB_BASE = "https://api.themoviedb.org/3";
+
+// ---------- Actor pool (famous actors, ~1990–present) ----------
+const ACTORS = [
+"Tom Hanks","Denzel Washington","Meryl Streep","Julia Roberts","Brad Pitt","Leonardo DiCaprio",
+"Sandra Bullock","Will Smith","Nicole Kidman","Russell Crowe","Cate Blanchett","Johnny Depp",
+"Angelina Jolie","Matt Damon","Tom Cruise","Reese Witherspoon","George Clooney","Charlize Theron",
+"Robert Downey Jr.","Scarlett Johansson","Christian Bale","Natalie Portman","Hugh Jackman","Emma Stone",
+"Ryan Gosling","Jennifer Lawrence","Chris Evans","Chris Hemsworth","Mark Ruffalo","Samuel L. Jackson",
+"Morgan Freeman","Anthony Hopkins","Kevin Spacey","Gary Oldman","Edward Norton","Kate Winslet",
+"Joaquin Phoenix","Amy Adams","Viola Davis","Octavia Spencer","Mahershala Ali","Michael B. Jordan",
+"Zendaya","Timothée Chalamet","Florence Pugh","Saoirse Ronan","Margot Robbie","Anne Hathaway",
+"Emily Blunt","Rachel McAdams","Ryan Reynolds","Jake Gyllenhaal","Paul Rudd","Steve Carell",
+"Jim Carrey","Adam Sandler","Ben Stiller","Owen Wilson","Vince Vaughn","Will Ferrell",
+"Seth Rogen","Jonah Hill","Emma Watson","Daniel Radcliffe","Rupert Grint","Keira Knightley",
+"Orlando Bloom","Elijah Wood","Ian McKellen","Viggo Mortensen","Liv Tyler","Sigourney Weaver",
+"Harrison Ford","Mark Hamill","Carrie Fisher","Ewan McGregor","Uma Thurman","John Travolta",
+"Bruce Willis","Sylvester Stallone","Arnold Schwarzenegger","Jean-Claude Van Damme","Vin Diesel","Dwayne Johnson",
+"Jason Statham","Michelle Rodriguez","Paul Walker","Tom Hardy","Idris Elba","Chiwetel Ejiofor",
+"David Oyelowo","Forest Whitaker","Don Cheadle","Jamie Foxx","Terrence Howard","Halle Berry",
+"Zoe Saldana","Karen Gillan","Elizabeth Olsen","Paul Bettany","Jeremy Renner","Chris Pratt",
+"Bradley Cooper","Sean Penn","Tim Robbins","Kevin Costner","Susan Sarandon","Julianne Moore",
+"Frances McDormand","Holly Hunter","Laura Dern","Jeff Goldblum","Sam Neill","Michael Douglas",
+"Kathleen Turner","Glenn Close","Jack Nicholson","Diane Keaton","Al Pacino","Robert De Niro",
+"Joe Pesci","Ray Liotta","Lorraine Bracco","Michael Caine","Heath Ledger","Aaron Eckhart",
+"Maggie Gyllenhaal","Marion Cotillard","Ellen Page","Joseph Gordon-Levitt","Cillian Murphy","Emily Watson",
+"Kenneth Branagh","Emma Thompson","Colin Firth","Geoffrey Rush","Helena Bonham Carter","Judi Dench",
+"Ralph Fiennes","Rachel Weisz","Naomi Watts","Nicolas Cage","John Cusack","Winona Ryder",
+"Christian Slater","Ethan Hawke","Julie Delpy","Michael Keaton","Val Kilmer","Tommy Lee Jones",
+"Josh Brolin","Benicio del Toro","Javier Bardem","Penélope Cruz","Antonio Banderas","Salma Hayek",
+"Gael García Bernal","Diego Luna","Michelle Yeoh","Chow Yun-fat","Jet Li","Ken Watanabe",
+"Rinko Kikuchi","Awkwafina","Constance Wu","Henry Golding","John Cho","Lucy Liu",
+"Sandra Oh","Steven Yeun","Kumail Nanjiani","Aziz Ansari","Mindy Kaling","Priyanka Chopra",
+"Dev Patel","Riz Ahmed","David Harbour","Millie Bobby Brown","Finn Wolfhard","Noah Schnapp",
+"Gaten Matarazzo","Tom Holland","Jacob Batalon","Marisa Tomei","J.K. Simmons","Miles Teller",
+"Sam Rockwell","Woody Harrelson","Regina King","Taraji P. Henson","Janelle Monáe","Chadwick Boseman",
+"Letitia Wright","Danai Gurira","Lupita Nyong'o","Winston Duke","Angela Bassett","Martin Freeman",
+"Andy Serkis","Benedict Cumberbatch","Tilda Swinton","Mads Mikkelsen","Willem Dafoe","Michael Shannon",
+"Jessica Chastain","Bryce Dallas Howard","Judy Greer","Vera Farmiga","John Krasinski","Domhnall Gleeson",
+"Adam Driver","Daisy Ridley","Oscar Isaac","John Boyega","Felicity Jones","Alden Ehrenreich",
+"Donald Glover","Paul Dano","Michael Fassbender","James McAvoy","Nicholas Hoult","Sophie Turner",
+"Evan Peters","Zoe Kravitz","Robert Pattinson","Kristen Stewart","Taylor Lautner","Anna Kendrick",
+"Rebel Wilson","Melissa McCarthy","Sofía Vergara","Amy Poehler","Tina Fey","Kristen Wiig",
+"Maya Rudolph","Eric Roberts"
+];
+const ACTOR_POOL = ACTORS; // already de-duplicated, one canonical spelling per actor
+
+// ---------- Category pool ----------
+const GENRES = ["Comedy","Drama","Action","Horror","Science Fiction","Romance","Crime","Thriller","Animation","Fantasy","War","Adventure","Mystery","Family","Music"];
+const DECADES = [1990,2000,2010,2020];
+const DIRECTORS = [
+"Steven Spielberg","Martin Scorsese","Christopher Nolan","Quentin Tarantino","David Fincher",
+"Ridley Scott","James Cameron","Denis Villeneuve","Wes Anderson","Coen Brothers",
+"Paul Thomas Anderson","Guillermo del Toro","Alfonso Cuarón","Peter Jackson","Ron Howard",
+"Clint Eastwood","Michael Bay","J.J. Abrams","Sam Mendes","Bong Joon-ho",
+"Greta Gerwig","Jordan Peele","Damien Chazelle","Alejandro González Iñárritu","Kathryn Bigelow",
+"Taika Waititi","Edgar Wright","Spike Lee","Tim Burton","Robert Zemeckis"
+];
+const COLLECTIONS = [
+"Marvel Cinematic Universe","Star Wars","Harry Potter","Fast & Furious","James Bond",
+"Mission: Impossible","The Lord of the Rings","X-Men","Jurassic Park","Ocean's",
+"The Dark Knight","Shrek","Toy Story","Rocky","Transformers","The Hunger Games",
+"Pirates of the Caribbean","John Wick","Spider-Man","The Matrix"
+];
+
+// ---------- Title and release-year categories ----------
+// These need only a film's title and release date, which every credit
+// already carries, so they cost no extra TMDb calls.
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const LETTER_RANGE_MIN = 7, LETTER_RANGE_MAX = 10; // letters covered, inclusive: "D-M" is 10
+const CONTAINS_LETTER_SETS = ["FVWY"];
+const YEAR_RANGE_EARLIEST = 1980;
+const YEAR_RANGE_MIN = 5, YEAR_RANGE_MAX = 10; // years covered, inclusive: "2010-2014" is 5
+// There are dozens of possible letter and year ranges, so a deal samples only
+// a few of each. Otherwise they'd crowd every other category type out.
+const LETTER_RANGES_PER_DEAL = 3;
+const YEAR_RANGES_PER_DEAL = 3;
+// Dailies before this date were dealt without these categories. Leaving them
+// out for earlier dates keeps those Dailies the same for anyone still on one.
+const TITLE_YEAR_CATEGORIES_FROM = "2026-11-09";
+
+// Which leading words "Title starts with" skips. A value is a letter range
+// plus an optional mode: "B-J:none", "B-J:the", "B-J:a". A bare "B-J" skips
+// all three articles. That's how every letter range worked before the modes
+// existed, so older Dailies, saved games and share links keep their meaning.
+// The label always says which mode applies.
+const ARTICLE_MODES = {
+  none:     {suffix: ":none", note: "",                   strip: null},
+  the:      {suffix: ":the",  note: ' (ignore "The")',    strip: /^THE\s+/},
+  a:        {suffix: ":a",    note: ' (ignore "A/An")',   strip: /^(AN|A)\s+/},
+  articles: {suffix: "",      note: " (ignore articles)", strip: /^(THE|AN|A)\s+/},
+};
+const ARTICLE_MODE_ORDER = ["none", "the", "a", "articles"];
+// Dailies from this date on deal a random mode per letter range. Earlier ones
+// keep their bare (ignore-articles) values, so they come out as they were.
+const ARTICLE_MODES_FROM = "2026-11-12";
+
+function allLetterRanges(){ // ["A-G", "A-H", ..., "T-Z"]
+  const out = [];
+  for(let i=0; i<ALPHABET.length; i++){
+    for(let n=LETTER_RANGE_MIN; n<=LETTER_RANGE_MAX && i+n<=ALPHABET.length; n++){
+      out.push(`${ALPHABET[i]}-${ALPHABET[i+n-1]}`);
+    }
+  }
+  return out;
+}
+
+function latestRangeYear(date){
+  return parseInt((date || todayInNewYork()).slice(0,4));
+}
+
+function allYearRanges(latest){ // ["1980-1984", ..., "2017-2026"]
+  const out = [];
+  for(let start=YEAR_RANGE_EARLIEST; start<=latest; start++){
+    for(let n=YEAR_RANGE_MIN; n<=YEAR_RANGE_MAX && start+n-1<=latest; n++){
+      const end = start+n-1;
+      if(start % 10 === 0 && n === 10) continue; // exactly a decade, already its own category
+      out.push(`${start}-${end}`);
+    }
+  }
+  return out;
+}
+
+function letterRangeValue(range, mode){ return range + ARTICLE_MODES[mode].suffix; }
+
+// "B-J:the" -> {range:"B-J", mode:"the"}; "B-J" -> {range:"B-J", mode:"articles"}.
+function parseLetterRangeValue(value){
+  const [range, tag] = value.split(":");
+  const mode = tag === undefined ? "articles" : ARTICLE_MODE_ORDER.find(m => ARTICLE_MODES[m].suffix === ":" + tag);
+  return {range, mode: mode || "articles"};
+}
+
+function allLetterRangeValues(){ // ["A-G:none", "A-G:the", "A-G:a", "A-G", ...]
+  return allLetterRanges().flatMap(r => ARTICLE_MODE_ORDER.map(m => letterRangeValue(r, m)));
+}
+
+function letterRangeLabel(value){ // "B-J:the" -> 'B–J (ignore "The")'
+  const {range, mode} = parseLetterRangeValue(value);
+  return dashed(range) + ARTICLE_MODES[mode].note;
+}
+
+function lettersLabel(letters){ // "FVWY" -> "F, V, W or Y"
+  const chars = letters.split("");
+  return chars.length > 1 ? chars.slice(0,-1).join(", ") + " or " + chars[chars.length-1] : letters;
+}
+
+// Uppercase, accents dropped ("Élite" -> "ELITE").
+function plainTitle(title){
+  return (title || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+}
+
+// The letter a title starts with once leading punctuation, and whichever
+// leading article the mode skips, are dropped: with "articles", "The Matrix"
+// is M; with "none" it's T. A title that starts with a digit
+// ("10 Cloverfield Lane") has no letter and fits no range.
+function titleFirstLetter(title, mode="articles"){
+  let t = plainTitle(title).replace(/^[^A-Z0-9]+/, "");
+  const strip = ARTICLE_MODES[mode].strip;
+  if(strip) t = t.replace(strip, "").replace(/^[^A-Z0-9]+/, "");
+  return /^[A-Z]/.test(t) ? t[0] : null;
+}
+
+function releaseYear(releaseDate){
+  const year = releaseDate ? parseInt(releaseDate.slice(0,4)) : NaN;
+  return isNaN(year) ? null : year;
+}
+
+function dashed(range){ return range.replace("-", "–"); } // "D-M" -> "D–M"
+
+function titleStartsInRange(title, value){
+  const {range, mode} = parseLetterRangeValue(value);
+  const [from, to] = range.split("-");
+  const letter = titleFirstLetter(title, mode);
+  return letter !== null && letter >= from && letter <= to;
+}
+
+function titleHasAnyLetter(title, letters){
+  const t = plainTitle(title);
+  return letters.split("").some(ch => t.includes(ch));
+}
+
+function releasedInRange(releaseDate, range){
+  const [from, to] = range.split("-").map(Number);
+  const year = releaseYear(releaseDate);
+  return year !== null && year >= from && year <= to;
+}
+
+function releasedInDecade(releaseDate, decade){
+  const year = releaseYear(releaseDate);
+  return year !== null && Math.floor(year/10)*10 === decade;
+}
+
+function sample(arr, n, rng=Math.random){
+  const copy = [...arr];
+  const out = [];
+  while(out.length < n && copy.length){
+    const i = Math.floor(rng()*copy.length);
+    out.push(copy.splice(i,1)[0]);
+  }
+  return out;
+}
+
+// ---------- Seeded randomness (Daily puzzle) ----------
+// The Daily is dealt in each player's own browser, so everyone gets the same
+// grid only if the dealer makes the same "random" picks everywhere: a string
+// seed (the date) drives a small deterministic PRNG in place of Math.random().
+
+function hashString(str){ // 32-bit FNV-1a
+  let h = 0x811c9dc5;
+  for(let i=0; i<str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function seededRng(seed){ // mulberry32
+  let a = hashString(seed);
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// The Daily rolls over at midnight New York time for everyone, wherever they are.
+const DAILY_TIME_ZONE = "America/New_York";
+const DAILY_EPOCH = "2026-09-23"; // Daily #1
+
+function todayInNewYork(){
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: DAILY_TIME_ZONE, year:"numeric", month:"2-digit", day:"2-digit"
+  }).formatToParts(new Date());
+  const get = type => parts.find(p => p.type === type).value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function dailyNumber(dateStr){
+  const toUtc = d => { const [y,m,day] = d.split("-").map(Number); return Date.UTC(y, m-1, day); };
+  return Math.round((toUtc(dateStr) - toUtc(DAILY_EPOCH)) / 86400000) + 1;
+}
+
+function formatDailyDate(dateStr){
+  const [y,m,d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m-1, d)).toLocaleDateString("en-US", {timeZone:"UTC", weekday:"short", month:"short", day:"numeric"});
+}
+
+// Short fingerprint of a grid's actors + categories, so two players can confirm
+// at a glance that they're looking at the same grid.
+function gridCode(actors, categories){
+  const canonical = actors.join("|") + "||" + categories.map(c => `${c.type}:${c.value}`).join("|");
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L lookalikes
+  let h = hashString(canonical);
+  let code = "";
+  for(let i=0; i<4; i++){ code += alphabet[h % alphabet.length]; h = Math.floor(h / alphabet.length); }
+  return code;
+}
+
+// ---------- App state ----------
+// Some mobile browsers (notably iOS Safari opening a file:// page) throw a
+// SecurityError on any localStorage access instead of just failing quietly.
+// Since this used to be a bare localStorage.getItem() call at the top of the
+// script, that error would halt every statement after it — including every
+// addEventListener() call below — leaving the whole page inert: it renders,
+// but no button does anything. These helpers make storage failures survivable.
+function safeStorageGet(key){
+  try{ return localStorage.getItem(key); } catch(err){ return null; }
+}
+function safeStorageSet(key, value){
+  try{ localStorage.setItem(key, value); return true; } catch(err){ return false; }
+}
+
+let apiKey = safeStorageGet("tmdb_key") || "";
+let puzzle = null; // {actors:[3], categories:[3]}
+let cellAnswers = {}; // "r-c" -> {title, id, points}
+let usedMovieIds = new Set();
+let totalScore = 0;
+let sandboxMode = false;
+let gridContext = null; // {kind:"random"|"daily"|"shared"|"custom", date?:"YYYY-MM-DD"} for the grid being played
+let gridLocked = false; // true once a Daily's answers have been revealed — no more submissions
+let sandboxCellCounts = {}; // "r-c" -> valid-answer count, kept in sync by refreshSandboxCell
+
+const el = id => document.getElementById(id);
+
+el("apiKey").value = apiKey;
+if(apiKey){
+  el("statusLine").textContent = "Key loaded from this browser. Ready to deal a puzzle.";
+  el("newPuzzle").disabled = false;
+  el("dailyPuzzle").disabled = false;
+  el("sandboxToggle").disabled = false;
+}
+
+el("saveKey").addEventListener("click", () => {
+  apiKey = el("apiKey").value.trim();
+  if(!apiKey){ el("statusLine").textContent = "Enter a key first."; return; }
+  const persisted = safeStorageSet("tmdb_key", apiKey);
+  el("statusLine").textContent = persisted
+    ? "Key saved. Ready to deal a puzzle."
+    : "Key set for this session — this browser isn't letting the page save data, so you'll need to paste it again next time you open the page. Ready to deal a puzzle.";
+  el("newPuzzle").disabled = false;
+  el("dailyPuzzle").disabled = false;
+  el("sandboxToggle").disabled = false;
+  if(pendingSharedGrid){
+    const grid = pendingSharedGrid;
+    pendingSharedGrid = null;
+    startShared(grid);
+  } else if(!puzzle){
+    startDaily();
+  }
+});
+
+el("newPuzzle").addEventListener("click", dealPuzzle);
+
+async function tmdb(path, params={}){
+  const url = new URL(TMDB_BASE + path);
+  url.searchParams.set("api_key", apiKey);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  if(!res.ok){
+    if(res.status === 401) throw new Error("TMDb rejected the API key.");
+    throw new Error("TMDb request failed (" + res.status + ")");
+  }
+  return res.json();
+}
+
+// Returns {id, profilePath} — the search hit already carries the headshot
+// path, so grabbing it here means the "click the name for a face" hint costs
+// no extra TMDb call for the overwhelming majority of people.
+async function findPerson(name){
+  const data = await tmdb("/search/person", {query:name});
+  if(data.results && data.results.length){
+    const hit = data.results[0];
+    return {id:hit.id, profilePath:hit.profile_path || null};
+  }
+  return null;
+}
+
+// ---------- Solvability checking ----------
+// Before a puzzle is shown, every actor x category cell is verified to have
+// at least one real answer, so you never get stuck on an impossible pairing.
+
+let genreNameToId = null;
+async function ensureGenreMap(){
+  if(genreNameToId) return genreNameToId;
+  const data = await tmdb("/genre/movie/list");
+  genreNameToId = {};
+  (data.genres || []).forEach(g => { genreNameToId[g.name] = g.id; });
+  return genreNameToId;
+}
+
+// TMDb's "movie" catalog includes non-feature entries (making-of featurettes,
+// behind-the-scenes shorts, bonus clips, theme-park ride POV videos, festival
+// shorts) credited alongside real films. Most have zero TMDb votes, which our
+// rarity formula would otherwise treat as *maximum* rarity — but some (e.g.
+// Disney park attraction videos) pick up a modest vote count too, so a vote
+// floor alone isn't enough. isRealFeatureCredit() is the single gate used
+// everywhere a film is considered valid: profile fetching, autocomplete
+// suggestions, and the actual submit check.
+const MIN_VOTE_COUNT = 1;
+const MIN_RUNTIME_MINUTES = 45;
+const NON_FEATURE_TITLE_PATTERN = /\b(behind[\s-]the[\s-]scenes|making[\s-]of|gag reel|bloopers|deleted scenes|bonus (features?|footage|clip)|featurette|extended (trailer|preview)|red[\s-]band trailer|teaser trailer|first look|table read)\b/i;
+
+// `video`, in every place we ever get a movie object (person credits, search
+// results, movie details), is TMDb's own flag for non-theatrical content —
+// shorts, webisodes, festival reels, behind-the-scenes videos. It's a much
+// more reliable junk signal than title-pattern matching and costs no extra
+// API calls. `runtime` only exists on the /movie/{id} details response, so
+// it's only enforced where that data is actually present.
+function isRealFeatureCredit(title, voteCount, video, runtime){
+  if((voteCount || 0) < MIN_VOTE_COUNT) return false;
+  if(!title) return false;
+  if(video) return false;
+  if(typeof runtime === "number" && runtime > 0 && runtime < MIN_RUNTIME_MINUTES) return false;
+  // TMDb entries for theme-park attractions / promo videos are consistently
+  // titled "Attraction Name | Venue" (e.g. "Star Wars: Rise of the
+  // Resistance | Disneyland Resort") — real film titles don't contain a
+  // literal pipe character, so this is a clean, low-false-positive signal.
+  if(title.includes("|")) return false;
+  if(NON_FEATURE_TITLE_PATTERN.test(title)) return false;
+  return true;
+}
+
+const personCache = new Map(); // name(lower) -> {id, credits, profilePath}
+async function getActorProfile(name){
+  const key = name.toLowerCase();
+  if(personCache.has(key)) return personCache.get(key);
+  const found = await findPerson(name);
+  if(found == null){
+    const empty = {id:null, credits:[], profilePath:null};
+    personCache.set(key, empty);
+    return empty;
+  }
+  const {id, profilePath} = found;
+  const data = await tmdb(`/person/${id}/movie_credits`);
+  const credits = (data.cast || [])
+    .filter(m => isRealFeatureCredit(m.title, m.vote_count, m.video))
+    .map(m => ({
+      id:m.id, title:m.title, genre_ids:m.genre_ids || [],
+      release_date:m.release_date, popularity:m.popularity || 0, vote_count:m.vote_count || 0,
+      vote_average:m.vote_average || 0
+    }))
+    .sort((a,b) => (b.popularity||0) - (a.popularity||0));
+  const profile = {id, credits, profilePath};
+  personCache.set(key, profile);
+  return profile;
+}
+
+const MOVIE_LOOKUP_CAP = 50; // most-popular-first cap on per-movie detail lookups
+
+// Caches the in-flight promise (not just the result) so parallel prefetches and
+// the sequential checks below never request the same film twice.
+const movieDetailCache = new Map(); // movieId -> Promise<{directors:[lower names], collection: lower string|null}>
+function getMovieDirectorCollection(movieId){
+  if(movieDetailCache.has(movieId)) return movieDetailCache.get(movieId);
+  const pending = tmdb(`/movie/${movieId}`, {append_to_response:"credits"}).then(details => {
+    const directors = (details.credits?.crew || [])
+      .filter(p => p.job === "Director")
+      .map(p => normalizeName(p.name));
+    const collection = details.belongs_to_collection ? details.belongs_to_collection.name.toLowerCase() : null;
+    return {directors, collection};
+  });
+  pending.catch(() => movieDetailCache.delete(movieId)); // don't cache failures
+  movieDetailCache.set(movieId, pending);
+  return pending;
+}
+
+// Director/collection checks look at up to MOVIE_LOOKUP_CAP films per actor —
+// fetched a batch at a time in parallel rather than one by one, which keeps a
+// 50-film window about as fast as the old 20-film one was sequentially.
+const DETAIL_FETCH_CONCURRENCY = 10;
+async function prefetchMovieDetails(profile){
+  const ids = profile.credits.slice(0, MOVIE_LOOKUP_CAP).map(m => m.id).filter(id => !movieDetailCache.has(id));
+  for(let i=0; i<ids.length; i+=DETAIL_FETCH_CONCURRENCY){
+    await Promise.all(ids.slice(i, i+DETAIL_FETCH_CONCURRENCY).map(getMovieDirectorCollection));
+  }
+}
+
+// Broad categories (genre, decade, title letters, year ranges) need a real
+// choice of answers, not just one — so a player who doesn't happen to know the
+// one obscure title an actor has in a genre isn't stuck. Director, collection,
+// and costar categories stay at a 1-match minimum: even famous pairings (e.g.
+// Scorsese/DiCaprio) rarely reach 5 shared films, so a 5-match floor there
+// would make those category types almost never dealable.
+const MIN_MATCHES_FOR_BROAD_CATEGORY = 5;
+
+// On top of that, each actor needs a film or two among those matches that
+// plenty of people have actually seen, so no cell is answerable only by deep
+// cuts. One for the 1-match types, two for the broad ones.
+const WELL_KNOWN_VOTE_COUNT = 5000;
+const MIN_WELL_KNOWN_FOR_NARROW_CATEGORY = 1;
+const MIN_WELL_KNOWN_FOR_BROAD_CATEGORY = 2;
+// Dailies before this date were dealt without the well-known-film rule.
+const WELL_KNOWN_RULE_FROM = "2026-11-12";
+
+// collectionName is TMDb's belongs_to_collection name, lowercased (or null).
+function collectionMatches(collectionName, query){
+  if(!collectionName) return false;
+  const q = query.toLowerCase();
+  const qShort = q.split(":")[0].trim();
+  return collectionName.includes(qShort) || collectionName.includes(q);
+}
+
+// Director/collection need each film's details, so they're only searched
+// among the actor's MOVIE_LOOKUP_CAP most popular films (same limit used to
+// verify solvability). An obscure credit outside that window won't show up in
+// See All, though it's still accepted if you type it in yourself.
+async function cappedMatches(profile, test){
+  await prefetchMovieDetails(profile);
+  const out = [];
+  for(const m of profile.credits.slice(0, MOVIE_LOOKUP_CAP)){
+    if(test(await getMovieDirectorCollection(m.id))) out.push(m);
+  }
+  return out;
+}
+
+// ---------- Category types ----------
+// Everything about a category type lives in its entry here. The dealer,
+// solvability checks, See All, guess checking, Sandbox and share links all
+// read from this table, so adding a type means adding one entry.
+//
+//   name              what Sandbox's type dropdown calls it
+//   label(v)          the column header, e.g. "Directed by Spike Lee"
+//   values({actors})  every allowed value. Share links and saved Dailies are
+//                     checked against it, and it fills Sandbox's dropdown.
+//   optionLabel(v)    how a value reads in that dropdown (default: as is)
+//   fromRaw(raw)      turns a dropdown's string back into a value (default: as is)
+//   dealValues({rng, excludeActors, date})
+//                     the values one deal may try (default: all of values())
+//   dealsFrom         first Daily date this type can appear in (optional)
+//   minMatches        films each actor needs before the category is dealt
+//   minWellKnown      how many of those need WELL_KNOWN_VOTE_COUNT+ votes
+//   capped            only searched among each actor's ~50 most popular films
+//   matches(profile, v)            the actor's credits that fit (may be async)
+//   fitsGuess(details, v, castNames)  whether a submitted film fits; details
+//                     is the /movie/{id} response with credits appended
+//
+// A deal draws its random values in this table's order, so a new type goes at
+// the end. Otherwise every older Daily would come out different.
+const CATEGORY_TYPES = {
+  genre: {
+    name: "Genre",
+    label: v => v,
+    values: () => GENRES,
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => m.genre_ids.includes(genreNameToId[v])),
+    fitsGuess: (details, v) => (details.genres || []).some(g => g.name.toLowerCase() === v.toLowerCase()),
+  },
+  decade: {
+    name: "Decade",
+    label: v => `Released in the ${v}s`,
+    values: () => DECADES,
+    optionLabel: v => `${v}s`,
+    fromRaw: raw => parseInt(raw),
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => releasedInDecade(m.release_date, v)),
+    fitsGuess: (details, v) => releasedInDecade(details.release_date, v),
+  },
+  director: {
+    name: "Director",
+    label: v => `Directed by ${v}`,
+    values: () => DIRECTORS,
+    minMatches: 1,
+    minWellKnown: MIN_WELL_KNOWN_FOR_NARROW_CATEGORY,
+    capped: true,
+    matches: (profile, v) => {
+      const target = normalizeName(v);
+      return cappedMatches(profile, info => info.directors.includes(target));
+    },
+    fitsGuess: (details, v) => (details.credits.crew || [])
+      .some(p => p.job === "Director" && normalizeName(p.name) === normalizeName(v)),
+  },
+  collection: {
+    name: "Franchise / collection",
+    label: v => v,
+    values: () => COLLECTIONS,
+    minMatches: 1,
+    minWellKnown: MIN_WELL_KNOWN_FOR_NARROW_CATEGORY,
+    capped: true,
+    matches: (profile, v) => cappedMatches(profile, info => collectionMatches(info.collection, v)),
+    fitsGuess: (details, v) =>
+      collectionMatches(details.belongs_to_collection ? details.belongs_to_collection.name.toLowerCase() : null, v),
+  },
+  costar: {
+    name: "Co-star",
+    label: v => `Co-starred with ${v}`,
+    values: ({actors=[]} = {}) => [...ACTOR_POOL].sort().filter(a => !actors.includes(a)),
+    // Only a random 15 per deal: testing all ~180 other actors for a shared
+    // credit is too many API calls.
+    dealValues: ({rng, excludeActors}) => sample(ACTOR_POOL.filter(a => !excludeActors.includes(a)), 15, rng),
+    minMatches: 1,
+    minWellKnown: MIN_WELL_KNOWN_FOR_NARROW_CATEGORY,
+    matches: async (profile, v) => {
+      const costar = await getActorProfile(v);
+      const ids = new Set(costar.credits.map(m => m.id));
+      return profile.credits.filter(m => ids.has(m.id));
+    },
+    fitsGuess: (details, v, castNames) => castNames.includes(v.toLowerCase()),
+  },
+  startswith: {
+    name: "Title starts with",
+    label: v => `Title starts with ${letterRangeLabel(v)}`,
+    values: () => allLetterRangeValues(),
+    optionLabel: letterRangeLabel,
+    dealValues: ({rng, date}) => {
+      const ranges = sample(allLetterRanges(), LETTER_RANGES_PER_DEAL, rng);
+      if(date && date < ARTICLE_MODES_FROM) return ranges; // bare = ignore articles, as dealt then
+      return ranges.map(r => letterRangeValue(r, ARTICLE_MODE_ORDER[Math.floor(rng() * ARTICLE_MODE_ORDER.length)]));
+    },
+    dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => titleStartsInRange(m.title, v)),
+    fitsGuess: (details, v) => titleStartsInRange(details.title, v),
+  },
+  contains: {
+    name: "Title contains",
+    label: v => `Title contains ${lettersLabel(v)}`,
+    values: () => CONTAINS_LETTER_SETS,
+    optionLabel: lettersLabel,
+    dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => titleHasAnyLetter(m.title, v)),
+    fitsGuess: (details, v) => titleHasAnyLetter(details.title, v),
+  },
+  years: {
+    name: "Release-year range",
+    label: v => `Released ${dashed(v)}`,
+    values: () => allYearRanges(latestRangeYear()).reverse(), // newest first in Sandbox
+    optionLabel: dashed,
+    dealValues: ({rng, date}) => sample(allYearRanges(latestRangeYear(date)), YEAR_RANGES_PER_DEAL, rng),
+    dealsFrom: TITLE_YEAR_CATEGORIES_FROM,
+    minMatches: MIN_MATCHES_FOR_BROAD_CATEGORY,
+    minWellKnown: MIN_WELL_KNOWN_FOR_BROAD_CATEGORY,
+    matches: (profile, v) => profile.credits.filter(m => releasedInRange(m.release_date, v)),
+    fitsGuess: (details, v) => releasedInRange(details.release_date, v),
+  },
+};
+
+// Types arrive from share links and storage, so "__proto__" and friends must
+// not resolve to anything.
+function categoryType(type){
+  return Object.prototype.hasOwnProperty.call(CATEGORY_TYPES, type) ? CATEGORY_TYPES[type] : null;
+}
+
+function makeCategory(type, value){
+  return {type, label: CATEGORY_TYPES[type].label(value), value};
+}
+
+function categoryFromTypeAndRaw(type, raw){
+  const def = categoryType(type);
+  return def ? makeCategory(type, def.fromRaw ? def.fromRaw(raw) : raw) : null;
+}
+
+// Every category a deal may try. `date` is the Daily's date when dealing a
+// Daily, null otherwise.
+function buildCategoryPool(excludeActors, rng=Math.random, date=null){
+  const pool = [];
+  for(const [type, def] of Object.entries(CATEGORY_TYPES)){
+    if(def.dealsFrom && date && date < def.dealsFrom) continue;
+    const values = def.dealValues ? def.dealValues({rng, excludeActors, date}) : def.values();
+    values.forEach(v => pool.push(makeCategory(type, v)));
+  }
+  return pool;
+}
+
+// requireWellKnown is off only for Dailies dealt before WELL_KNOWN_RULE_FROM.
+async function categoryValidForAll(cat, actorProfiles, requireWellKnown=true){
+  const def = categoryType(cat.type);
+  if(!def) return false;
+  for(const p of actorProfiles){
+    const found = await def.matches(p, cat.value);
+    if(found.length < def.minMatches) return false;
+    if(requireWellKnown &&
+       found.filter(m => (m.vote_count || 0) >= WELL_KNOWN_VOTE_COUNT).length < def.minWellKnown) return false;
+  }
+  return true;
+}
+
+// ---------- Reveal: every valid answer for one actor x category cell ----------
+async function getValidFilms(actorProfile, cat){
+  const def = categoryType(cat.type);
+  const matches = def ? await def.matches(actorProfile, cat.value) : [];
+  return matches
+    .map(m => ({title:m.title, id:m.id, vote_count:m.vote_count, vote_average:m.vote_average, release_date:m.release_date, rarity:rarityScore(m.vote_count)}))
+    .sort((a,b) => (b.rarity - a.rarity) || b.title.localeCompare(a.title)); // rarity desc, title desc
+}
+
+// ---------- "See All" modal: full answer list for one cell or one actor ----------
+
+function openModal(title, bodyHtml, wide=false){
+  el("modalTitle").textContent = title;
+  el("modalBody").innerHTML = bodyHtml;
+  el("modalBox").classList.toggle("wide", wide);
+  el("modalOverlay").style.display = "flex";
+}
+function setModalBody(html){
+  el("modalBody").innerHTML = html;
+}
+function closeModal(){
+  el("modalOverlay").style.display = "none";
+}
+el("modalClose").addEventListener("click", closeModal);
+el("modalOverlay").addEventListener("click", e => { if(e.target.id === "modalOverlay") closeModal(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(); });
+
+// ---------- Headshot modal: a face to go with the name ----------
+// A row header is just a name, which is no hint at all if you don't recognize
+// it. Clicking the name shows TMDb's headshot for that person. Image files
+// live on a separate CDN host that takes no API key — the only thing we need
+// from the API is the path, which findPerson() already captured.
+const PROFILE_IMAGE_BASE = "https://image.tmdb.org/t/p/w342";
+// Posters render at ~113px wide in a grid cell; w342 keeps them sharp on a
+// 2x display and is still only a few tens of KB.
+const POSTER_IMAGE_BASE = "https://image.tmdb.org/t/p/w342";
+
+// The search hit's profile_path is null for a small number of people even when
+// TMDb does hold photos for them, so fall back to the person's image list —
+// but only on demand, and only once per person per session either way.
+async function getHeadshotPath(profile){
+  if(profile.profilePath) return profile.profilePath;
+  if(profile.headshotLookedUp || !profile.id) return null;
+  const data = await tmdb(`/person/${profile.id}/images`);
+  const best = (data.profiles || [])[0];
+  profile.profilePath = (best && best.file_path) || null;
+  profile.headshotLookedUp = true; // set only on a clean response, so a transient failure stays retryable
+  return profile.profilePath;
+}
+
+async function openActorHeadshot(actorName){
+  openModal(actorName, `<div class="modal-status">Loading photo…</div>`);
+  try{
+    const profile = await getActorProfile(actorName);
+    const path = await getHeadshotPath(profile);
+    if(!path){
+      setModalBody(`<div class="modal-status">TMDb doesn't have a photo for this actor.</div>`);
+      return;
+    }
+    setModalBody(`<div class="headshot"><img id="headshotImg"><div class="credit">Photo via TMDb</div></div>`);
+    const img = el("headshotImg");
+    img.alt = `Photo of ${actorName}`;
+    // A path can go stale between TMDb's index and its CDN; show a line of
+    // text rather than a broken-image icon if the file doesn't load.
+    img.addEventListener("error", () => {
+      setModalBody(`<div class="modal-status">Couldn't load the photo for this actor.</div>`);
+    });
+    img.src = PROFILE_IMAGE_BASE + path;
+  } catch(err){
+    setModalBody(`<div class="modal-status">${err.message || "Couldn't load a photo."}</div>`);
+  }
+}
+
+// ---------- Methodology / FAQ modal ----------
+
+const FAQ_ITEMS = [
+  {
+    q: "Does a film need any TMDb votes to count as an answer?",
+    a: `Yes — at least 1 (<code>MIN_VOTE_COUNT</code>). TMDb's movie catalog includes non-feature entries
+        (making-of featurettes, behind-the-scenes shorts, bonus clips, theme-park ride POV videos,
+        festival shorts) credited to actors right alongside real films, and these are almost always at 0
+        TMDb votes — e.g. "Blade Runner 2049: Behind the Scenes" under Ryan Gosling.
+        <code>isRealFeatureCredit()</code> rejects anything with 0 votes, anything TMDb itself flags as
+        non-theatrical content (<code>video: true</code> on the TMDb movie object — this catches most
+        shorts and behind-the-scenes videos directly, e.g. "The Basement" (2011), an 11-minute short
+        under Adam Driver), anything under 45 minutes when TMDb reports a runtime (only available once
+        you're viewing a film's own detail page, not in search/autocomplete), anything with a "|" in the
+        title (a reliable sign of a theme-park or promo entry, e.g. "... | Disneyland Resort"), and
+        anything matching a title-pattern denylist ("behind the scenes," "making of," "bloopers," etc.).
+        This is a heuristic, not a guarantee — if a junk title still slips through, use
+        <code>inspect_tmdb.py</code> (see the project README) to inspect the raw TMDb data for it.`
+  },
+  {
+    q: "I don't recognize an actor's name — can I see who they are?",
+    a: `Click the actor's name in the row header (it's the one with the dotted underline) and you'll get
+        TMDb's headshot for that person. It's a memory jog only — it doesn't reveal or narrow down any
+        answers, and it costs no points. The photo path comes back on the same
+        <code>/search/person</code> call the app already makes to look the actor up, so in almost all
+        cases this adds no extra TMDb requests at all.`
+  },
+  {
+    q: "What's the number in the corner of a solved cell?",
+    a: `That's what the cell scored. A correct answer turns the cell into the film's poster with its
+        score badged in the corner — click the badge for the breakdown (completeness + rarity, and the
+        vote count the rarity came from). If TMDb has no poster on file for that film, the cell shows
+        the title instead.`
+  },
+  {
+    q: "How is the rarity score (1–50) calculated?",
+    a: `<code>rarityScore()</code> maps a film's TMDb <code>vote_count</code> onto a 1–50 scale on a
+        log10 curve: roughly 4 votes or fewer scores the maximum (50), roughly 20,000 votes or more
+        scores the minimum (1), and everything in between is interpolated smoothly on the log scale —
+        so the gap between 10 and 100 votes moves the score a lot more than the gap between 10,000 and
+        20,000 does. A correct cell is worth 50 points (for a valid answer) + that rarity score, so
+        51–100 points total per cell.`
+  },
+  {
+    q: "Why isn't rarity based on IMDb instead?",
+    a: `IMDb has no public API at all, and TMDb has no direct equivalent of an IMDb review count — this
+        app only ever talks to TMDb, so rarity is TMDb's own vote count, not IMDb's.`
+  },
+  {
+    q: "Why didn't a film I know an actor is in get accepted for a Director or Franchise/Collection category?",
+    a: `Those two category types only check each actor's ~${MOVIE_LOOKUP_CAP} most popular films —
+        checking every film's director/collection for every actor on every deal would mean far too many
+        TMDb calls. An obscure film outside that window won't be suggested by "See All" or counted
+        toward solvability, but it'll still be accepted if you type its exact title yourself and it
+        actually satisfies the category.`
+  },
+  {
+    q: "How do the title-letter and year-range categories work?",
+    a: `<b>Title starts with</b> (e.g. "D–M") goes by a title's first letter, accents ignored. The
+        category says whether a leading article is skipped: plain "D–M" counts "The Matrix" as T;
+        <i>(ignore "The")</i> skips a leading "The" so it counts as M; <i>(ignore "A/An")</i> skips a leading
+        "A" or "An"; <i>(ignore articles)</i> skips all three. A title that starts with a number
+        ("10 Cloverfield Lane") doesn't fit any letter range.
+        <b>Title contains F, V, W or Y</b> checks the whole title, "The" included, for any one of those
+        letters. <b>Released</b> ranges (e.g. "Released 2010–2016") include both end years. All three
+        go by TMDb's English title and release date.`
+  },
+  {
+    q: "How does the app guarantee a dealt puzzle is actually solvable?",
+    a: `Before showing a puzzle, it fetches real filmographies for the 3 sampled actors and tests category
+        candidates one at a time against all three, only keeping a category once it's confirmed to have a
+        valid answer for every actor. For genre, decade, title-letter and year-range categories, "valid" means at
+        least ${MIN_MATCHES_FOR_BROAD_CATEGORY} matching films for that actor, not just one — so you have
+        real odds of knowing at least one answer instead of needing to land on a single obscure title.
+        Director, franchise/collection, and co-star categories keep a 1-match minimum, since even famous
+        pairings rarely reach ${MIN_MATCHES_FOR_BROAD_CATEGORY} shared films. Each actor also needs at least
+        ${MIN_WELL_KNOWN_FOR_NARROW_CATEGORY} well-known matching film (${WELL_KNOWN_VOTE_COUNT.toLocaleString()}+ TMDb votes)
+        for those, and ${MIN_WELL_KNOWN_FOR_BROAD_CATEGORY} for the broad ones, so no cell can be answered only with
+        deep cuts. A grid also never gets two
+        categories of the same type (no Comedy + Drama, no two co-stars). If a trio of actors can't
+        yield 3 solvable categories after enough tries, it resamples a new trio rather than ever showing
+        an unsolvable grid. Sandbox mode deliberately bypasses this guarantee, warning you instead if a
+        cell has 0 valid answers.`
+  },
+  {
+    q: "How does everyone get the same Daily?",
+    a: `There's no server — each browser deals the Daily itself, but with a random-number generator seeded
+        by the date (New York time), so everyone's dealer makes the same picks and lands on the same grid.
+        The one catch: the dealer still checks each pick against live TMDb data, so if TMDb answered a check
+        differently for two people (it re-ranks films by popularity daily), their grids could come out
+        different. Compare the 4-letter grid code shown above the grid — if yours doesn't match a friend's,
+        have them click <b>Share grid</b> and open their link; a link to today's Daily becomes your Daily.`
+  }
+];
+
+function openFaqModal(){
+  const html = FAQ_ITEMS.map(item =>
+    `<div class="faq-item"><div class="faq-q">${item.q}</div><div class="faq-a">${item.a}</div></div>`
+  ).join("");
+  openModal("Methodology & FAQ", html, true);
+}
+
+el("faqLink").addEventListener("click", e => { e.preventDefault(); openFaqModal(); });
+
+function isCapped(cat){ return !!categoryType(cat.type)?.capped; }
+
+let toastTimer = null;
+function showToast(message, ok=true){
+  const toast = el("toast");
+  toast.className = "toast show" + (ok ? "" : " warn");
+  toast.innerHTML = `<span class="toast-icon">${ok ? "✓" : "⚠"}</span><span>${message}</span>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.classList.remove("show"); }, 2200);
+}
+
+// ---------- Sandbox-only: copy a snippet identifying a person/film for inspect_tmdb.py ----------
+// The exact TMDb data our filtering logic (isRealFeatureCredit, category matching) reads is only
+// visible in the raw API response — this hands the IDs needed to fetch it straight to a companion
+// Python script, without exposing an API key anywhere in the page.
+
+function buildApiSnippet(personId, personName, movieId, movieTitle){
+  let s = `person_id=${personId}&person_name=${encodeURIComponent(personName)}`;
+  if(movieId != null) s += `&movie_id=${movieId}&movie_title=${encodeURIComponent(movieTitle)}`;
+  return s;
+}
+
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function copyToClipboard(text){
+  const report = ok => {
+    if(ok){
+      showToast("API-call snippet copied to clipboard");
+      el("statusLine").textContent = "Paste it into api_call_to_review in inspect_tmdb.py.";
+    } else {
+      showToast("Couldn't copy automatically — see the status line", false);
+      el("statusLine").textContent = `Copy this manually: ${text}`;
+    }
+  };
+  copyText(text).then(report);
+}
+
+function fallbackCopy(text){
+  try{
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch(err){
+    return false;
+  }
+}
+
+function escapeHtml(text){
+  return String(text).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+
+// ---------- Sortable film table, shared by both "See All" modals ----------
+// Columns are defined once; the cell modal adds a Pts column on top. Number
+// columns sort high-to-low on first click, Title sorts A–Z; clicking the
+// active column again flips it. Films with no value for the sort column
+// (e.g. no release date) always sink to the bottom. Ties fall back to title.
+const FILM_COLUMNS = {
+  title:  {label:"Title",  num:false, value:f => f.title,
+           cell:f => escapeHtml(f.title)},
+  year:   {label:"Year",   num:true,  value:f => f.release_date || null,
+           cell:f => f.release_date ? formatYear(f.release_date) : `<span class="muted">—</span>`},
+  rating: {label:"Rating", num:true,  value:f => f.vote_average || null,
+           cell:f => f.vote_average ? f.vote_average.toFixed(1) : `<span class="muted">—</span>`},
+  votes:  {label:"Votes",  num:true,  value:f => f.vote_count || 0,
+           cell:f => Number(f.vote_count || 0).toLocaleString()},
+  points: {label:"Pts",    num:true,  value:f => 50 + f.rarity,
+           cell:f => 50 + f.rarity},
+};
+
+// Every "See All" opens sorted by Votes, most first. Clicking a header
+// re-sorts that table only; the next one opens on Votes again.
+const FILM_TABLE_DEFAULT_SORT = {key:"votes", dir:"desc"};
+
+function sortFilms(films, key, dir){
+  const col = FILM_COLUMNS[key];
+  const sign = dir === "asc" ? 1 : -1;
+  return [...films].sort((a, b) => {
+    const av = col.value(a), bv = col.value(b);
+    const aMissing = av == null, bMissing = bv == null;
+    if(aMissing !== bMissing) return aMissing ? 1 : -1;
+    if(!aMissing && av !== bv){
+      const cmp = typeof av === "string" ? av.localeCompare(bv) : av - bv;
+      if(cmp) return cmp * sign;
+    }
+    return a.title.localeCompare(b.title);
+  });
+}
+
+// Renders the table into the modal body and wires sorting (and, in Sandbox,
+// click-a-row-to-copy-an-API-snippet).
+function renderFilmTable({films, kind, columns, notesHtml = "", mineTitle = null, personId, personName}){
+  const sort = {...FILM_TABLE_DEFAULT_SORT};
+  const head = columns.map(key => {
+    const col = FILM_COLUMNS[key];
+    return `<th class="${col.num ? "num" : ""}" data-key="${key}"><button type="button" class="sort-btn">${col.label}<span class="sort-arrow"></span></button></th>`;
+  }).join("");
+  setModalBody(`${notesHtml}<table class="film-table"><thead><tr>${head}</tr></thead><tbody></tbody></table>`);
+  const table = el("modalBody").querySelector(".film-table");
+  const tbody = table.querySelector("tbody");
+
+  function draw(){
+    table.querySelectorAll("thead th").forEach(th => {
+      const active = th.dataset.key === sort.key;
+      if(active) th.setAttribute("aria-sort", sort.dir === "asc" ? "ascending" : "descending");
+      else th.removeAttribute("aria-sort");
+      th.querySelector(".sort-arrow").textContent = active ? (sort.dir === "asc" ? "▲" : "▼") : "";
+    });
+    tbody.innerHTML = sortFilms(films, sort.key, sort.dir).map(f => {
+      const mine = mineTitle && f.title.toLowerCase() === mineTitle;
+      const cls = [mine ? "mine" : "", sandboxMode ? "copyable" : ""].join(" ").trim();
+      const cells = columns.map(key => {
+        const col = FILM_COLUMNS[key];
+        const tag = key === "title" && mine ? `<span class="mine-tag">your pick</span>` : "";
+        return `<td class="${col.num ? "num" : ""}">${col.cell(f)}${tag}</td>`;
+      }).join("");
+      return `<tr class="${cls}" data-movie-id="${f.id}" data-movie-title="${escapeHtml(f.title)}">${cells}</tr>`;
+    }).join("");
+  }
+
+  table.querySelector("thead").addEventListener("click", e => {
+    const th = e.target.closest("th[data-key]");
+    if(!th) return;
+    const key = th.dataset.key;
+    if(key === sort.key) sort.dir = sort.dir === "asc" ? "desc" : "asc";
+    else { sort.key = key; sort.dir = FILM_COLUMNS[key].num ? "desc" : "asc"; }
+    draw();
+  });
+  if(sandboxMode){
+    tbody.addEventListener("click", e => {
+      const tr = e.target.closest("tr[data-movie-id]");
+      if(tr) copyToClipboard(buildApiSnippet(personId, personName, tr.dataset.movieId, tr.dataset.movieTitle));
+    });
+  }
+  draw();
+}
+
+const SANDBOX_COPY_NOTE = `<div class="modal-note">Click a title to copy an API-call snippet for <code>inspect_tmdb.py</code>.</div>`;
+
+async function openCellSeeAll(r, c){
+  const actorName = puzzle.actors[r];
+  const cat = puzzle.categories[c];
+  openModal(`${actorName} — ${cat.label}`, `<div class="modal-status">Loading matches…</div>`, true);
+  try{
+    const profile = await getActorProfile(actorName);
+    const films = await getValidFilms(profile, cat);
+    if(!films.length){
+      setModalBody(`<div class="modal-status">No matches found${isCapped(cat) ? " among this actor's most notable films" : ""}.</div>`);
+      return;
+    }
+    const yourAnswer = cellAnswers[`${r}-${c}`];
+    const capNote = isCapped(cat)
+      ? `<div class="modal-note">Searched among this actor's ~${MOVIE_LOOKUP_CAP} most popular films.</div>` : "";
+    renderFilmTable({
+      films, kind:"cell",
+      columns:["title", "year", "rating", "votes", "points"],
+      notesHtml: capNote + (sandboxMode ? SANDBOX_COPY_NOTE : ""),
+      mineTitle: yourAnswer ? yourAnswer.title.toLowerCase() : null,
+      personId: profile.id, personName: actorName,
+    });
+  } catch(err){
+    setModalBody(`<div class="modal-status">${err.message || "Couldn't load matches."}</div>`);
+  }
+}
+
+async function openActorSeeAll(r){
+  const actorName = puzzle.actors[r];
+  openModal(`${actorName} — all films`, `<div class="modal-status">Loading filmography…</div>`, true);
+  try{
+    const profile = await getActorProfile(actorName);
+    if(!profile.credits.length){
+      setModalBody(`<div class="modal-status">No credits found.</div>`);
+      return;
+    }
+    renderFilmTable({
+      films: profile.credits, kind:"actor",
+      columns:["title", "year", "rating", "votes"],
+      notesHtml: sandboxMode ? SANDBOX_COPY_NOTE : "",
+      personId: profile.id, personName: actorName,
+    });
+  } catch(err){
+    setModalBody(`<div class="modal-status">${err.message || "Couldn't load filmography."}</div>`);
+  }
+}
+
+function injectCellSeeAll(r, c){
+  const wrap = el(`seeAllWrap-${r}-${c}`);
+  if(!wrap || wrap.querySelector("button")) return;
+  const btn = document.createElement("button");
+  btn.className = "see-all-btn secondary";
+  btn.textContent = "See All";
+  btn.addEventListener("click", () => openCellSeeAll(r, c));
+  wrap.appendChild(btn);
+}
+
+function injectActorSeeAll(r){
+  const wrap = el(`seeAllActor-${r}`);
+  if(!wrap || wrap.querySelector("button")) return;
+  const btn = document.createElement("button");
+  btn.className = "see-all-btn secondary";
+  btn.textContent = "See All";
+  btn.addEventListener("click", () => openActorSeeAll(r));
+  wrap.appendChild(btn);
+}
+
+function enableSeeAll(){
+  if(!puzzle) return;
+  puzzle.actors.forEach((actor, r) => {
+    injectActorSeeAll(r);
+    puzzle.categories.forEach((cat, c) => injectCellSeeAll(r, c));
+  });
+  el("seeAllReadyBtn").disabled = true;
+  el("statusLine").textContent = "\"See All\" is ready on each actor and grid box — works whether or not you've answered that cell.";
+}
+
+el("seeAllReadyBtn").addEventListener("click", onSeeAllReady);
+
+// In the Daily, seeing every answer is a way to finish early — so it locks
+// the grid (and saves that) rather than letting you peek and keep playing.
+function onSeeAllReady(){
+  if(gridContext && gridContext.kind === "daily" && !gridLocked){
+    const filled = Object.keys(cellAnswers).length;
+    if(filled < 9){
+      const proceed = confirm(
+        `Revealing answers ends today's Daily — you won't be able to submit any more answers to it, ` +
+        `and your score stays at ${totalScore} (${filled} / 9 filled). Continue?`
+      );
+      if(!proceed) return;
+    }
+    lockGrid();
+    saveDailyProgress();
+  }
+  enableSeeAll();
+}
+
+const MAX_ACTOR_ATTEMPTS = 6;   // re-sample the actor trio this many times if needed
+const MAX_DAILY_ACTOR_ATTEMPTS = 20; // the Daily's attempts are fixed by its seed, so allow more before giving up for the day
+const MAX_CATEGORY_CANDIDATES = 60; // give up on this trio after trying this many categories
+// A dealt grid never has two categories of the same type (no Comedy + Drama,
+// no two letter ranges). Dailies before this date were dealt without the rule,
+// so it's left off for them to keep those grids as they were.
+const ONE_CATEGORY_PER_TYPE_FROM = "2026-11-10";
+
+function typeAlreadyUsed(categories, cand){
+  return categories.some(c => c && c.type === cand.type);
+}
+
+// With a seed, every attempt gets its own PRNG seeded from (seed, attempt number),
+// so the picks for attempt N never depend on how many random draws earlier
+// attempts happened to use — two players only diverge if TMDb itself answers
+// a solvability check differently for them.
+async function pickSolvablePuzzle(seed=null, dailyDate=null){
+  await ensureGenreMap();
+
+  const maxAttempts = seed ? MAX_DAILY_ACTOR_ATTEMPTS : MAX_ACTOR_ATTEMPTS;
+  const onePerType = !dailyDate || dailyDate >= ONE_CATEGORY_PER_TYPE_FROM;
+  const requireWellKnown = !dailyDate || dailyDate >= WELL_KNOWN_RULE_FROM;
+  for(let attempt = 0; attempt < maxAttempts; attempt++){
+    const rng = seed ? seededRng(`${seed}#${attempt}`) : Math.random;
+    const actors = sample(ACTOR_POOL, 3, rng);
+    el("statusLine").textContent = `Dealing... checking ${actors.join(", ")}`;
+
+    const actorProfiles = [];
+    for(const name of actors) actorProfiles.push(await getActorProfile(name));
+    if(actorProfiles.some(p => !p.id || p.credits.length === 0)) continue;
+
+    const catPool = buildCategoryPool(actors, rng, dailyDate);
+    const shuffledCategories = sample(catPool, catPool.length, rng); // full shuffle
+    const categories = [];
+    let tested = 0;
+
+    for(const cand of shuffledCategories){
+      if(categories.length >= 3) break;
+      if(tested >= MAX_CATEGORY_CANDIDATES) break;
+      const dup = categories.some(c => c.type === cand.type && c.value === cand.value);
+      if(dup) continue;
+      if(onePerType && typeAlreadyUsed(categories, cand)) continue;
+      tested++;
+      el("statusLine").textContent = `Dealing... testing "${cand.label}" (${categories.length}/3 set)`;
+      if(await categoryValidForAll(cand, actorProfiles, requireWellKnown)) categories.push(cand);
+    }
+
+    if(categories.length === 3) return {actors, categories};
+  }
+
+  return null;
+}
+
+function setDealButtonsDisabled(disabled){
+  el("newPuzzle").disabled = disabled;
+  el("dailyPuzzle").disabled = disabled;
+  el("sandboxToggle").disabled = disabled;
+}
+
+async function dealPuzzle(){
+  closeModal();
+  setDealButtonsDisabled(true);
+  el("seeAllReadyBtn").disabled = true;
+  el("statusLine").textContent = "Dealing...";
+
+  let result;
+  try{
+    result = await pickSolvablePuzzle();
+  } catch(err){
+    el("statusLine").textContent = err.message || "Something went wrong dealing a puzzle.";
+    setDealButtonsDisabled(false);
+    return;
+  }
+  setDealButtonsDisabled(false);
+
+  if(!result){
+    el("statusLine").textContent = "Couldn't find a fully solvable puzzle just now — click Deal again.";
+    return;
+  }
+
+  startGrid(result.actors, result.categories, {kind:"random"});
+  el("statusLine").textContent = "New puzzle dealt — every cell has been checked for a valid answer.";
+}
+
+// ---------- Daily puzzle: one seeded grid per New York calendar day ----------
+
+async function startDaily(){
+  const date = todayInNewYork();
+  const saved = loadDailySave(date);
+  if(saved){
+    startGrid(saved.actors, saved.categories, {kind:"daily", date}, saved);
+    el("statusLine").textContent = saved.revealed
+      ? `You've finished Daily #${dailyNumber(date)} — a new one arrives at midnight New York time.`
+      : `Welcome back — Daily #${dailyNumber(date)} picks up where you left off.`;
+    return;
+  }
+
+  closeModal();
+  setDealButtonsDisabled(true);
+  el("seeAllReadyBtn").disabled = true;
+  el("statusLine").textContent = "Dealing today's Daily...";
+
+  let result;
+  try{
+    result = await pickSolvablePuzzle(`daily:${date}`, date);
+  } catch(err){
+    el("statusLine").textContent = err.message || "Something went wrong dealing today's Daily.";
+    setDealButtonsDisabled(false);
+    return;
+  }
+  setDealButtonsDisabled(false);
+
+  if(!result){
+    el("statusLine").textContent = "Couldn't deal today's Daily — ask a friend who has it for their \"Share grid\" link, or deal a random puzzle instead.";
+    return;
+  }
+
+  startGrid(result.actors, result.categories, {kind:"daily", date});
+  saveDailyProgress();
+  el("statusLine").textContent = "Today's Daily is ready — everyone gets this same grid today. Compare grid codes with friends to make sure you match.";
+}
+
+el("dailyPuzzle").addEventListener("click", startDaily);
+
+// Only today's Daily is kept; an older save is simply ignored (and overwritten
+// by the next save). Stored as the same compact spec share links use, and run
+// through the same validation on the way back in.
+const DAILY_STORAGE_KEY = "reel_daily";
+
+function loadDailySave(date){
+  let data;
+  try{ data = JSON.parse(safeStorageGet(DAILY_STORAGE_KEY) || "null"); } catch(err){ return null; }
+  if(!data || data.date !== date) return null;
+  const grid = gridFromSpec(data.grid);
+  if(!grid) return null;
+  return {...grid, answers: data.answers || {}, revealed: !!data.revealed};
+}
+
+function saveDailyProgress(){
+  if(!gridContext || gridContext.kind !== "daily") return;
+  safeStorageSet(DAILY_STORAGE_KEY, JSON.stringify({
+    date: gridContext.date,
+    grid: gridToSpec(puzzle.actors, puzzle.categories),
+    answers: cellAnswers,
+    revealed: gridLocked
+  }));
+}
+
+// ---------- Share links: the whole grid, encoded in the URL ----------
+// #g=<base64url JSON> with {a:[3 actor names], c:[[type,value] x3], d?:"YYYY-MM-DD" if it's a Daily}.
+// Opening a link rebuilds that exact grid — no dealing, no TMDb lookups needed —
+// so it works even if two players' Dailies ever came out different.
+
+function gridToSpec(actors, categories, date=null){
+  const spec = {a: actors, c: categories.map(c => [c.type, c.value])};
+  if(date) spec.d = date;
+  return spec;
+}
+
+// Anything arriving from a URL (or storage) is checked against the same fixed
+// pools the dealer draws from; names end up in the page's HTML, so nothing
+// outside those lists is ever accepted.
+function gridFromSpec(spec){
+  if(!spec || !Array.isArray(spec.a) || !Array.isArray(spec.c)) return null;
+  if(spec.a.length !== 3 || spec.c.length !== 3) return null;
+  const actors = spec.a;
+  if(!actors.every(a => ACTOR_POOL.includes(a)) || new Set(actors).size !== 3) return null;
+
+  const categories = [];
+  for(const pair of spec.c){
+    if(!Array.isArray(pair) || pair.length !== 2) return null;
+    const [type, value] = pair;
+    const def = categoryType(type);
+    if(!def || !def.values({actors}).includes(value)) return null;
+    if(categories.some(c => c.type === type && c.value === value)) return null;
+    categories.push(makeCategory(type, value));
+  }
+
+  const date = typeof spec.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(spec.d) && dailyNumber(spec.d) >= 1 ? spec.d : null;
+  return {actors, categories, date};
+}
+
+function encodeSpec(spec){
+  const bytes = new TextEncoder().encode(JSON.stringify(spec));
+  let bin = "";
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeSpec(str){
+  try{
+    const bin = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = Uint8Array.from(bin, ch => ch.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch(err){
+    return null;
+  }
+}
+
+function shareUrl(){
+  const date = gridContext && gridContext.date ? gridContext.date : null;
+  const base = location.href.split("#")[0];
+  return `${base}#g=${encodeSpec(gridToSpec(puzzle.actors, puzzle.categories, date))}`;
+}
+
+function shareText(){
+  const code = gridCode(puzzle.actors, puzzle.categories);
+  const lines = [];
+  if(gridContext && gridContext.date){
+    lines.push(`The Reel Deal — Daily #${dailyNumber(gridContext.date)} (${formatDailyDate(gridContext.date)}) · grid ${code}`);
+  } else {
+    lines.push(`The Reel Deal — grid ${code}`);
+  }
+  const filled = Object.keys(cellAnswers).length;
+  if(filled){
+    lines.push(`${totalScore} pts · ${filled}/9`);
+    for(let r=0; r<3; r++){
+      let row = "";
+      for(let c=0; c<3; c++) row += cellAnswers[`${r}-${c}`] ? "🟩" : "⬜";
+      lines.push(row);
+    }
+  }
+  lines.push(shareUrl());
+  return lines.join("\n");
+}
+
+el("shareGridBtn").addEventListener("click", async () => {
+  if(!puzzle) return;
+  const text = shareText();
+  if(await copyText(text)){
+    showToast("Grid link copied — paste it to a friend");
+    el("statusLine").textContent = "Anyone who opens that link gets this exact grid.";
+  } else {
+    showToast("Couldn't copy automatically — see the status line", false);
+    el("statusLine").textContent = `Copy this link manually: ${shareUrl()}`;
+  }
+});
+
+// Returns undefined when the URL has no grid link, null when it has a broken one.
+function takeSharedGridFromUrl(){
+  const m = location.hash.match(/^#g=([A-Za-z0-9_-]+)$/);
+  if(!m) return undefined;
+  try{ history.replaceState(null, "", location.href.split("#")[0]); } catch(err){ /* e.g. file:// quirks */ }
+  return gridFromSpec(decodeSpec(m[1]));
+}
+
+// A link to *today's* Daily becomes your Daily (progress saved as usual) — that's
+// the fix if your seeded Daily ever came out different from a friend's. Links to
+// an older Daily, or to any non-Daily grid, just load as a one-off shared grid.
+function startShared(grid){
+  const today = todayInNewYork();
+  if(grid.date !== today){
+    startGrid(grid.actors, grid.categories, {kind:"shared", date: grid.date});
+    el("statusLine").textContent = grid.date
+      ? `Loaded a friend's grid from Daily #${dailyNumber(grid.date)} — good luck!`
+      : "Loaded a friend's grid — good luck!";
+    return;
+  }
+
+  const sharedCode = gridCode(grid.actors, grid.categories);
+  const saved = loadDailySave(today);
+  if(saved && gridCode(saved.actors, saved.categories) === sharedCode){
+    startGrid(saved.actors, saved.categories, {kind:"daily", date: today}, saved);
+    el("statusLine").textContent = "That's the same grid as your Daily — picking up where you left off.";
+    return;
+  }
+  if(saved && Object.keys(saved.answers).length){
+    const mine = gridCode(saved.actors, saved.categories);
+    const proceed = confirm(
+      `This link is today's Daily as a friend got it (grid ${sharedCode}), but yours came out as grid ${mine}, ` +
+      `and you've already answered ${Object.keys(saved.answers).length} cell(s).\n\n` +
+      `Switch your Daily to your friend's grid? Your answers so far will be lost.`
+    );
+    if(!proceed){
+      startGrid(saved.actors, saved.categories, {kind:"daily", date: today}, saved);
+      el("statusLine").textContent = "Kept your own Daily.";
+      return;
+    }
+  }
+  startGrid(grid.actors, grid.categories, {kind:"daily", date: today});
+  saveDailyProgress();
+  el("statusLine").textContent = "Loaded today's Daily from a friend's link — your progress on it is saved as usual.";
+}
+
+let pendingSharedGrid = null; // a link opened before an API key was saved
+
+function handleUrlGrid(){
+  const shared = takeSharedGridFromUrl();
+  if(shared === undefined) return false;
+  if(shared === null){
+    el("statusLine").textContent = "That grid link looks broken or incomplete — ask for it again, or deal a puzzle.";
+    return true;
+  }
+  if(!apiKey){
+    pendingSharedGrid = shared;
+    el("statusLine").textContent = "Someone shared a grid with you — paste your TMDb key above and click Save key to play it.";
+    return true;
+  }
+  startShared(shared);
+  return true;
+}
+
+window.addEventListener("hashchange", handleUrlGrid);
+
+// ---------- Starting any playable grid (random, Daily, shared, or from Sandbox) ----------
+
+function startGrid(actors, categories, context, saved=null){
+  closeModal();
+  if(sandboxMode){
+    sandboxMode = false;
+    el("sandboxToggle").checked = false;
+  }
+  puzzle = {actors, categories};
+  gridContext = context;
+  gridLocked = false;
+  cellAnswers = {};
+  cellSelections = {};
+  usedMovieIds = new Set();
+  totalScore = 0;
+
+  el("game").style.display = "block";
+  el("scoreboard").style.display = "flex";
+  el("sandboxBar").style.display = "none";
+  setDealButtonsDisabled(false);
+  el("seeAllReadyBtn").disabled = false;
+  el("shareGridBtn").disabled = false;
+
+  renderPlayableGrid(actors, categories);
+
+  if(saved){
+    Object.entries(saved.answers).forEach(([key, ans]) => {
+      const [r, c] = key.split("-").map(Number);
+      if(!(r >= 0 && r < 3 && c >= 0 && c < 3) || !ans || typeof ans.title !== "string") return;
+      cellAnswers[key] = ans;
+      usedMovieIds.add(ans.id);
+      totalScore += Number(ans.points) || 0;
+      renderCorrectCell(r, c, ans);
+    });
+    if(saved.revealed){
+      lockGrid();
+      enableSeeAll();
+    }
+  }
+
+  refreshScoreDisplay();
+  renderGridInfo();
+}
+
+function renderGridInfo(){
+  const code = `grid <span class="grid-code">${gridCode(puzzle.actors, puzzle.categories)}</span>`;
+  let html;
+  if(gridContext.kind === "daily"){
+    html = `<strong>Daily #${dailyNumber(gridContext.date)}</strong> · ${formatDailyDate(gridContext.date)} · ${code} — ` +
+           `same grid for everyone today; a new one at midnight New York time`;
+  } else if(gridContext.kind === "shared"){
+    html = gridContext.date
+      ? `<strong>Shared grid</strong> from Daily #${dailyNumber(gridContext.date)} (${formatDailyDate(gridContext.date)}) · ${code}`
+      : `<strong>Shared grid</strong> · ${code}`;
+  } else if(gridContext.kind === "custom"){
+    html = `<strong>Sandbox grid</strong> · ${code}`;
+  } else {
+    html = `<strong>Random deal</strong> · ${code}`;
+  }
+  // The status line is context-specific (Daily, shared, sandbox, ...) and gets
+  // overwritten by the next action, so the headshot hint lives here instead —
+  // this bar renders once for every grid, whatever started it, and persists
+  // while you play.
+  el("gridInfo").innerHTML = html +
+    ` · <span class="grid-hint">don't recognize an actor? click their name for a photo</span>`;
+}
+
+function refreshScoreDisplay(){
+  el("totalScore").textContent = String(totalScore);
+  el("filledCount").textContent = `${Object.keys(cellAnswers).length} / 9 filled`;
+  refreshUsedList();
+}
+
+// A solved cell becomes the film's poster with its score as a badge in the
+// corner. The title text only appears as the fallback when there's no poster to
+// show — it's no secret either way (it's in "Used so far"), so the poster
+// carries a tooltip with it.
+function renderCorrectCell(r, c, ans){
+  el(`cell-${r}-${c}`).classList.add("correct");
+  const label = `${ans.title} (${formatYear(ans.release_date)})`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "answer";
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "movie-title";
+  titleEl.textContent = label;
+
+  if(ans.poster_path){
+    const img = document.createElement("img");
+    img.className = "poster";
+    img.loading = "lazy";
+    img.alt = `Poster for ${label}`;
+    img.title = label;
+    // A path can go stale between TMDb's index and its CDN — fall back to the
+    // title rather than leaving a broken-image icon in the cell.
+    img.addEventListener("error", () => img.replaceWith(titleEl));
+    img.src = POSTER_IMAGE_BASE + ans.poster_path;
+    wrap.appendChild(img);
+  } else {
+    wrap.appendChild(titleEl);
+  }
+
+  const ptsBtn = document.createElement("button");
+  ptsBtn.type = "button";
+  ptsBtn.className = "pts-btn";
+  ptsBtn.textContent = `${ans.points} pts`;
+  ptsBtn.title = "How this score breaks down";
+  ptsBtn.addEventListener("click", () => openPointsBreakdown(ans));
+  wrap.appendChild(ptsBtn);
+
+  const inner = el(`cellInner-${r}-${c}`);
+  inner.innerHTML = "";
+  inner.appendChild(wrap);
+}
+
+function openPointsBreakdown(ans){
+  openModal(`${ans.title} (${formatYear(ans.release_date)})`, `
+    <div class="points-breakdown">
+      <div class="line">+50 completeness — every valid answer scores this</div>
+      <div class="line">+${ans.rarity} rarity — ${Number(ans.vote_count || 0).toLocaleString()} TMDb votes</div>
+      <div class="total">${ans.points} pts</div>
+      <div class="note">Rarity runs 1–50 on a log curve over a film's TMDb vote count:
+        roughly 4 votes or fewer scores the full 50, roughly 20,000 or more scores 1.</div>
+    </div>
+  `);
+}
+
+function lockGrid(){
+  gridLocked = true;
+  for(let r=0; r<3; r++){
+    for(let c=0; c<3; c++){
+      if(cellAnswers[`${r}-${c}`]) continue;
+      const input = el(`input-${r}-${c}`);
+      if(input) input.disabled = true;
+      const btn = el(`cell-${r}-${c}`)?.querySelector("button.go");
+      if(btn) btn.disabled = true;
+    }
+  }
+}
+
+// Builds the normal "type an answer and Submit" grid — used both by dealPuzzle()
+// and when leaving Sandbox mode with a hand-built actor/category trio.
+function renderPlayableGrid(actors, categories){
+  categories.forEach((c,i) => { el("cat"+i).textContent = c.label; });
+
+  const body = el("gridBody");
+  body.innerHTML = "";
+  actors.forEach((actor, r) => {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.innerHTML = `
+      <div class="actor-name"><button type="button" class="actor-name-btn"></button></div>
+      <div class="actor-seeall-wrap" id="seeAllActor-${r}"></div>
+    `;
+    const nameBtn = th.querySelector(".actor-name-btn");
+    nameBtn.textContent = actor;
+    nameBtn.title = `See a photo of ${actor}`;
+    nameBtn.addEventListener("click", () => openActorHeadshot(actor));
+    tr.appendChild(th);
+    categories.forEach((cat, c) => {
+      const td = document.createElement("td");
+      td.className = "cell";
+      td.id = `cell-${r}-${c}`;
+      td.innerHTML = `
+        <div class="cell-inner" id="cellInner-${r}-${c}">
+          <div class="ac-wrap">
+            <input type="text" id="input-${r}-${c}" placeholder="Name a film..." autocomplete="off">
+            <ul class="ac-list" id="ac-${r}-${c}"></ul>
+          </div>
+          <button class="go" data-r="${r}" data-c="${c}">Submit</button>
+          <div class="fail-msg" id="fail-${r}-${c}"></div>
+        </div>
+        <div class="see-all-wrap" id="seeAllWrap-${r}-${c}"></div>
+      `;
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll("button.go").forEach(btn => {
+    btn.addEventListener("click", () => submitGuess(parseInt(btn.dataset.r), parseInt(btn.dataset.c)));
+  });
+  body.querySelectorAll("input[type=text]").forEach(inp => {
+    const [_, r, c] = inp.id.split("-");
+    const list = el(`ac-${r}-${c}`);
+
+    inp.addEventListener("input", () => {
+      const key = `${r}-${c}`;
+      delete cellSelections[key];
+      const q = inp.value.trim();
+      if(q.length < 2){ list.style.display = "none"; list.innerHTML = ""; return; }
+      debounce(key, () => doAutocomplete(r, c, q));
+    });
+
+    inp.addEventListener("keydown", e => {
+      if(e.key === "Enter"){
+        list.style.display = "none";
+        submitGuess(parseInt(r), parseInt(c));
+      } else if(e.key === "Escape"){
+        list.style.display = "none";
+      }
+    });
+
+    inp.addEventListener("blur", () => {
+      setTimeout(() => { list.style.display = "none"; }, 150);
+    });
+  });
+}
+
+// ---------- Sandbox mode: hand-build a grid, previewing answer counts per cell ----------
+
+el("sandboxToggle").addEventListener("change", onSandboxToggle);
+el("fillInGridBtn").addEventListener("click", fillInGrid);
+
+async function onSandboxToggle(e){
+  if(e.target.checked){
+    const proceed = confirm("Enabling Sandbox mode clears the current grid so you can build your own actor/category combinations. Continue?");
+    if(!proceed){ e.target.checked = false; return; }
+    enterSandboxMode();
+  } else {
+    e.target.disabled = true;
+    const left = await exitSandboxMode();
+    e.target.disabled = false;
+    if(!left) e.target.checked = true;
+  }
+}
+
+function enterSandboxMode(){
+  sandboxMode = true;
+  closeModal();
+  puzzle = {actors:[null,null,null], categories:[null,null,null]};
+  cellAnswers = {};
+  usedMovieIds = new Set();
+  totalScore = 0;
+  sandboxCellCounts = {};
+
+  el("game").style.display = "block";
+  el("scoreboard").style.display = "none";
+  el("sandboxBar").style.display = "flex";
+  el("newPuzzle").disabled = true;
+  el("dailyPuzzle").disabled = true;
+  el("gridInfo").innerHTML = "";
+  gridContext = null;
+  el("usedList").textContent = "";
+  el("statusLine").textContent = "Sandbox mode — pick an actor for each row and a category for each column.";
+
+  renderSandboxGrid();
+}
+
+async function exitSandboxMode(){
+  if(puzzle.actors.some(a => !a) || puzzle.categories.some(c => !c)){
+    el("statusLine").textContent = "Set all 3 actors and 3 categories first — or click \"Fill in grid\" — before leaving Sandbox mode.";
+    return false;
+  }
+
+  el("statusLine").textContent = "Double-checking every cell has a valid answer...";
+  await refreshAllSandboxCells(); // cache-backed, so this is fast — makes sure counts are current
+
+  const zeroCells = [];
+  for(let r=0; r<3; r++){
+    for(let c=0; c<3; c++){
+      if(sandboxCellCounts[`${r}-${c}`] === 0){
+        zeroCells.push(`${puzzle.actors[r]} × ${puzzle.categories[c].label}`);
+      }
+    }
+  }
+  if(zeroCells.length){
+    const proceed = confirm(
+      `Heads up: ${zeroCells.length} cell(s) have no valid answers:\n\n${zeroCells.join("\n")}\n\n` +
+      `You can still play, but at least one cell won't be solvable. Continue anyway?`
+    );
+    if(!proceed){
+      el("statusLine").textContent = "Stayed in Sandbox mode — adjust the flagged cell(s), or click \"Fill in grid\" again.";
+      return false;
+    }
+  }
+
+  sandboxMode = false;
+  startGrid(puzzle.actors, puzzle.categories, {kind:"custom"});
+  el("statusLine").textContent = "Your sandbox grid is ready to play — click Share grid to send it to a friend. Good luck!";
+  return true;
+}
+
+function actorOptionsHtml(){
+  return [...ACTOR_POOL].sort().map(a => `<option value="${a}">${a}</option>`).join("");
+}
+
+const CATEGORY_TYPE_OPTIONS = Object.entries(CATEGORY_TYPES).map(([value, def]) => ({value, label: def.name}));
+function renderSandboxGrid(){
+  for(let c=0; c<3; c++){
+    el("cat"+c).innerHTML = `
+      <div class="sandbox-cat">
+        <select id="catType-${c}">
+          <option value="">Category type…</option>
+          ${CATEGORY_TYPE_OPTIONS.map(o => `<option value="${o.value}">${o.label}</option>`).join("")}
+        </select>
+        <select id="catValue-${c}" style="display:none;"></select>
+      </div>
+    `;
+    el(`catType-${c}`).addEventListener("change", () => onSandboxCatTypeChange(c));
+  }
+
+  const body = el("gridBody");
+  body.innerHTML = "";
+  for(let r=0; r<3; r++){
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.innerHTML = `
+      <select class="actor-select" id="actorSelect-${r}"><option value="">Actor…</option>${actorOptionsHtml()}</select>
+      <button class="see-all-btn secondary" id="copyActorApi-${r}" style="display:none;margin-top:4px;">Copy API call</button>
+    `;
+    tr.appendChild(th);
+    for(let c=0; c<3; c++){
+      const td = document.createElement("td");
+      td.className = "cell";
+      td.id = `sandboxCell-${r}-${c}`;
+      td.innerHTML = `<div class="sandbox-hint">Set both actor &amp; category</div>`;
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+  for(let r=0; r<3; r++){
+    el(`actorSelect-${r}`).addEventListener("change", () => onSandboxActorChange(r));
+  }
+}
+
+function onSandboxActorChange(r){
+  const name = el(`actorSelect-${r}`).value || null;
+  if(name && puzzle.actors.some((existing, idx) => idx !== r && existing === name)){
+    el("statusLine").textContent = `${name} is already used in another row — pick a different actor.`;
+    el(`actorSelect-${r}`).value = "";
+    puzzle.actors[r] = null;
+  } else {
+    puzzle.actors[r] = name;
+  }
+
+  const copyBtn = el(`copyActorApi-${r}`);
+  if(puzzle.actors[r]){
+    copyBtn.style.display = "inline-block";
+    copyBtn.onclick = async () => {
+      const profile = await getActorProfile(puzzle.actors[r]);
+      copyToClipboard(buildApiSnippet(profile.id, puzzle.actors[r]));
+    };
+  } else {
+    copyBtn.style.display = "none";
+  }
+  refreshSandboxRow(r);
+}
+
+function onSandboxCatTypeChange(c){
+  const type = el(`catType-${c}`).value;
+  const valueSelect = el(`catValue-${c}`);
+  puzzle.categories[c] = null;
+
+  if(!type){
+    valueSelect.style.display = "none";
+    valueSelect.innerHTML = "";
+    refreshSandboxColumn(c);
+    return;
+  }
+
+  const def = categoryType(type);
+  const options = def.values().map(v => ({value:String(v), label: def.optionLabel ? def.optionLabel(v) : String(v)}));
+
+  valueSelect.innerHTML = `<option value="">Choose…</option>` + options.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
+  valueSelect.style.display = "inline-block";
+  valueSelect.onchange = () => onSandboxCatValueChange(c, type);
+  refreshSandboxColumn(c);
+}
+
+function onSandboxCatValueChange(c, type){
+  const raw = el(`catValue-${c}`).value;
+  if(!raw){ puzzle.categories[c] = null; refreshSandboxColumn(c); return; }
+
+  const cat = categoryFromTypeAndRaw(type, raw);
+  const dup = puzzle.categories.some((existing, idx) => idx !== c && existing && existing.type === cat.type && existing.value === cat.value);
+  if(dup){
+    el("statusLine").textContent = "That category is already used in another column — pick a different one.";
+    el(`catValue-${c}`).value = "";
+    puzzle.categories[c] = null;
+    return;
+  }
+  puzzle.categories[c] = cat;
+  refreshSandboxColumn(c);
+}
+
+function refreshSandboxRow(r){ for(let c=0; c<3; c++) refreshSandboxCell(r, c); }
+function refreshSandboxColumn(c){ for(let r=0; r<3; r++) refreshSandboxCell(r, c); }
+async function refreshAllSandboxCells(){
+  for(let r=0; r<3; r++){ for(let c=0; c<3; c++){ await refreshSandboxCell(r, c); } }
+}
+
+async function refreshSandboxCell(r, c){
+  const cellEl = el(`sandboxCell-${r}-${c}`);
+  if(!cellEl) return;
+  const actor = puzzle.actors[r];
+  const cat = puzzle.categories[c];
+  const key = `${r}-${c}`;
+  if(!actor || !cat){
+    delete sandboxCellCounts[key];
+    cellEl.innerHTML = `<div class="sandbox-hint">Set both actor &amp; category</div>`;
+    return;
+  }
+  cellEl.innerHTML = `<div class="sandbox-hint">Checking…</div>`;
+  try{
+    const profile = await getActorProfile(actor);
+    const films = await getValidFilms(profile, cat);
+    sandboxCellCounts[key] = films.length;
+    cellEl.innerHTML = `<div class="sandbox-count${films.length === 0 ? " zero" : ""}">${films.length} valid answer${films.length === 1 ? "" : "s"}</div>`;
+    const btn = document.createElement("button");
+    btn.className = "see-all-btn secondary";
+    btn.textContent = "See All";
+    btn.addEventListener("click", () => openCellSeeAll(r, c));
+    cellEl.appendChild(btn);
+  } catch(err){
+    delete sandboxCellCounts[key];
+    cellEl.innerHTML = `<div class="sandbox-hint">${err.message || "Couldn't check this pairing."}</div>`;
+  }
+}
+
+// Randomly fills any actor/category slot the user left blank, trying to keep
+// the result solvable against whatever the user already set by hand. Slots
+// the user filled in themselves are never overwritten or second-guessed —
+// Sandbox mode is explicitly for exploring combinations, "bad" ones included.
+async function fillInGrid(){
+  el("fillInGridBtn").disabled = true;
+  el("sandboxToggle").disabled = true;
+  el("statusLine").textContent = "Filling in the rest of the grid...";
+  try{
+    await ensureGenreMap();
+
+    for(let r=0; r<3; r++){
+      if(puzzle.actors[r]) continue;
+      const excluded = puzzle.actors.filter(Boolean);
+      const candidates = sample(ACTOR_POOL.filter(a => !excluded.includes(a)), ACTOR_POOL.length);
+      const setCats = puzzle.categories.filter(Boolean);
+      let chosen = null;
+      for(const candidate of candidates){
+        const profile = await getActorProfile(candidate);
+        if(!profile.id || !profile.credits.length) continue;
+        let ok = true;
+        for(const cat of setCats){
+          if(!(await categoryValidForAll(cat, [profile]))){ ok = false; break; }
+        }
+        if(ok){ chosen = candidate; break; }
+      }
+      puzzle.actors[r] = chosen || candidates[0];
+      el(`actorSelect-${r}`).value = puzzle.actors[r];
+    }
+
+    if(puzzle.categories.some(c => !c)){
+      const actorProfiles = [];
+      for(const name of puzzle.actors) actorProfiles.push(await getActorProfile(name));
+      const excludedCats = puzzle.categories.filter(Boolean);
+      const pool = buildCategoryPool(puzzle.actors).filter(cand =>
+        !excludedCats.some(x => x.type === cand.type && x.value === cand.value)
+      );
+      const shuffled = sample(pool, pool.length);
+      let idx = 0;
+
+      for(let c=0; c<3; c++){
+        if(puzzle.categories[c]) continue;
+        let chosen = null;
+        while(idx < shuffled.length){
+          const cand = shuffled[idx++];
+          const dup = puzzle.categories.some(x => x && x.type === cand.type && x.value === cand.value);
+          if(dup) continue;
+          // Your own picks can share a type; random fills never add a repeat.
+          if(typeAlreadyUsed(puzzle.categories, cand)) continue;
+          if(await categoryValidForAll(cand, actorProfiles)){ chosen = cand; break; }
+        }
+        puzzle.categories[c] = chosen || shuffled[0];
+        syncSandboxCategorySelects(c, puzzle.categories[c]);
+      }
+    }
+
+    await refreshAllSandboxCells();
+    el("statusLine").textContent = "Grid filled in. Uncheck Sandbox mode when you're ready to play it.";
+  } catch(err){
+    el("statusLine").textContent = err.message || "Couldn't finish filling in the grid.";
+  } finally {
+    el("fillInGridBtn").disabled = false;
+    el("sandboxToggle").disabled = false;
+  }
+}
+
+function syncSandboxCategorySelects(c, cat){
+  el(`catType-${c}`).value = cat.type;
+  onSandboxCatTypeChange(c); // rebuilds the value <select> options for this type
+  el(`catValue-${c}`).value = String(cat.value);
+  puzzle.categories[c] = cat; // onSandboxCatTypeChange() clears it above; restore it
+}
+
+const debounceTimers = {};
+function debounce(key, fn, delay=300){
+  clearTimeout(debounceTimers[key]);
+  debounceTimers[key] = setTimeout(fn, delay);
+}
+
+let cellSelections = {};
+
+async function doAutocomplete(r, c, query){
+  const list = el(`ac-${r}-${c}`);
+  try{
+    const data = await tmdb("/search/movie", {query});
+    const filtered = (data.results || []).filter(m => isRealFeatureCredit(m.title, m.vote_count, m.video));
+    if(!filtered.length){
+      list.style.display = "none";
+      list.innerHTML = "";
+      return;
+    }
+    const top = filtered.slice(0, 8);
+    const counts = {};
+    top.forEach(m => {
+      const t = m.title.toLowerCase();
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    list.innerHTML = "";
+    top.forEach(m => {
+      const t = m.title.toLowerCase();
+      const year = m.release_date ? m.release_date.slice(0, 4) : "";
+      const showYear = counts[t] >= 2 && year;
+      const li = document.createElement("li");
+      li.textContent = showYear ? `${m.title} (${year})` : m.title;
+      li.addEventListener("mousedown", e => {
+        e.preventDefault();
+        el(`input-${r}-${c}`).value = m.title;
+        cellSelections[`${r}-${c}`] = {id: m.id, title: m.title};
+        list.style.display = "none";
+        list.innerHTML = "";
+      });
+      list.appendChild(li);
+    });
+    list.style.display = "block";
+  } catch(err){
+    list.style.display = "none";
+  }
+}
+
+function rarityScore(voteCount){
+  const vc = Math.max(voteCount, 0);
+  const lg = Math.log10(vc + 1); // ~0 (0 votes) to ~4.5 (30k+ votes)
+  let score = 50 - ((lg - 0.7) / (4.3 - 0.7)) * 49;
+  return Math.max(1, Math.min(50, Math.round(score)));
+}
+
+async function submitGuess(r, c){
+  const key = `${r}-${c}`;
+  if(cellAnswers[key] || gridLocked) return; // already solved, or Daily answers revealed
+  const input = el(`input-${r}-${c}`);
+  const failEl = el(`fail-${r}-${c}`);
+  const title = input.value.trim();
+  if(!title){ failEl.textContent = "Type a film title first."; return; }
+  failEl.textContent = "Checking...";
+
+  const actorName = puzzle.actors[r];
+  const cat = puzzle.categories[c];
+
+  try{
+    let movieId;
+    const sel = cellSelections[key];
+    if(sel && sel.title === title){
+      movieId = sel.id;
+    } else {
+      const search = await tmdb("/search/movie", {query:title});
+      if(!search.results || !search.results.length){
+        failEl.textContent = "No film found by that title.";
+        return;
+      }
+      movieId = search.results[0].id;
+    }
+    if(usedMovieIds.has(movieId)){
+      failEl.textContent = "Already used that film elsewhere in the grid.";
+      return;
+    }
+    const details = await tmdb(`/movie/${movieId}`, {append_to_response:"credits"});
+
+    if(!isRealFeatureCredit(details.title, details.vote_count, details.video, details.runtime)){
+      failEl.textContent = `"${details.title}" doesn't look like a real feature film on TMDb (no votes / bonus content / too short) — try another title.`;
+      return;
+    }
+
+    const castNames = (details.credits.cast || []).map(p => p.name.toLowerCase());
+    if(!castNames.includes(actorName.toLowerCase())){
+      failEl.textContent = `${actorName} isn't credited as an actor in that film.`;
+      return;
+    }
+
+    const def = categoryType(cat.type);
+    const catOk = !!def && def.fitsGuess(details, cat.value, castNames);
+
+    if(!catOk){
+      failEl.textContent = `Correct actor, but that film doesn't satisfy "${cat.label}".`;
+      return;
+    }
+
+    const rarity = rarityScore(details.vote_count);
+    const points = 50 + rarity;
+    // A grid switch (Deal, Daily, a link) while this check was in flight means
+    // this answer belongs to a grid that's no longer on screen — drop it.
+    if(puzzle.actors[r] !== actorName || puzzle.categories[c] !== cat || gridLocked) return;
+
+    const ans = {title: details.title, release_date: details.release_date, id: movieId, points, rarity,
+                 vote_count: details.vote_count, poster_path: details.poster_path || null};
+    cellAnswers[key] = ans;
+    usedMovieIds.add(movieId);
+    delete cellSelections[key];
+    totalScore += points;
+
+    renderCorrectCell(r, c, ans);
+    refreshScoreDisplay();
+    saveDailyProgress();
+  } catch(err){
+    failEl.textContent = err.message || "Something went wrong.";
+  }
+}
+
+function normalizeName(n){
+  return n.toLowerCase().replace(/[^a-z]/g,"");
+}
+
+function formatYear(releaseDate){
+  return releaseDate ? releaseDate.slice(0,4) : "—";
+}
+
+function refreshUsedList(){
+  const entries = Object.values(cellAnswers).map(a => `${a.title} (${formatYear(a.release_date)})`);
+  el("usedList").textContent = entries.length ? "Used so far: " + entries.join(", ") : "";
+}
+
+// ---------- On load: a shared grid link wins; otherwise go straight to today's Daily ----------
+if(!handleUrlGrid() && apiKey) startDaily();
+</script>
+</body>
+</html>
