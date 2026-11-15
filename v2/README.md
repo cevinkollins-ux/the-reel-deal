@@ -1,8 +1,10 @@
 # The Reel Deal v2
 
 An experimental second version of the game, kept apart from the original so the
-two can be compared. Nothing outside this folder was changed: the root
-`index.html` is exactly as it was.
+two can be compared. The root `index.html` is exactly as it was. Outside this
+folder only two things changed: `.gitignore` gained two lines (`.env` and
+`v2/.cache/`), and `.claude/launch.json` gained a `reel-deal-v2-dev` entry for
+the dev server (left uncommitted, next to your own uncommitted edit there).
 
 - **What was found, and why v2 does what it does:** [FINDINGS.md](FINDINGS.md)
 - **The game:** [index.html](index.html) (still one file, no build step)
