@@ -39,7 +39,7 @@ separately.
 | Category mix | First three categories that pass, so mostly genre + decade | Grid shape chosen first; usually one of director / franchise / co-star |
 | Whole-grid check | None | Nine different well-known films must exist |
 | The Daily | Dealt live in each browser | Next 60 days dealt ahead and stored in the page; live dealing after that |
-| TMDb calls per deal | about 120 (up to 795) | about 12 (up to 58) |
+| TMDb calls per deal | about 120 (up to 795) | about 13 (up to 33) |
 
 Also new: a **Scoring lab** (footer link) that shows any actor's films with old
 and new points and lets you move the scoring sliders, a guess counter, a
