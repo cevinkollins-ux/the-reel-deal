@@ -1,0 +1,33 @@
+--- a/index.html
++++ b/index.html
+@@ -529,6 +529,12 @@
+ "Maya Rudolph","Eric Roberts"
+ ];
+ const ACTOR_POOL = ACTORS; // already de-duplicated, one canonical spelling per actor
++// TMDb spells four of these names differently. Guesses are checked by comparing
++// names, so without this every answer for these four actors is rejected.
++const POOL_NAME_FOR_TMDB_NAME = {
++  "zoe saldaña": "zoe saldana", "zoë kravitz": "zoe kravitz",
++  "salma hayek pinault": "salma hayek", "priyanka chopra jonas": "priyanka chopra"
++};
+ 
+ // ---------- Category pool ----------
+ const GENRES = ["Comedy","Drama","Action","Horror","Science Fiction","Romance","Crime","Thriller","Animation","Fantasy","War","Adventure","Mystery","Family","Music"];
+@@ -1127,6 +1133,7 @@
+ 
+ // ---------- Reveal: every valid answer for one actor x category cell ----------
+ async function getValidFilms(actorProfile, cat){
++  await ensureGenreMap(); // not loaded yet after a reload or a share link
+   const def = categoryType(cat.type);
+   const matches = def ? await def.matches(actorProfile, cat.value) : [];
+   return matches
+@@ -2435,7 +2442,8 @@
+       return;
+     }
+ 
+-    const castNames = (details.credits.cast || []).map(p => p.name.toLowerCase());
++    const castNames = (details.credits.cast || []).map(p => p.name.toLowerCase())
++      .map(n => POOL_NAME_FOR_TMDB_NAME[n] || n);
+     if(!castNames.includes(actorName.toLowerCase())){
+       failEl.textContent = `${actorName} isn't credited as an actor in that film.`;
+       return;

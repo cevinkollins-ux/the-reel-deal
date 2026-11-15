@@ -5,11 +5,18 @@
 
   /            v2/index.html, with a one-line hook injected so the page talks
                to the local TMDB proxy instead of needing a key pasted in
+  /plain/      v2/index.html exactly as GitHub Pages would serve it: no hook,
+               so it asks for a key like the original does
   /v1/         the ORIGINAL root index.html, patched in memory the same way
                (the file on disk is never touched), for side-by-side checks
+  /v1-hotfix/  the original with v2/patches/v1-hotfix.patch applied, also in
+               memory only, to try the patch before deciding whether to apply it
   /tmdb/...    proxy to api.themoviedb.org/3, key added server-side from .env,
                responses cached on disk under v2/.cache/ (24h)
   /__stats     how many TMDB calls the page has made (hits vs cache)
+  /__save/NAME (POST) writes the request body to v2/.cache/saved/NAME.txt, so a
+               result computed in the page (pre-dealt Dailies, a simulation)
+               can be picked up by a script without copying it by hand
 
 The key never reaches the browser. Binds to 127.0.0.1 only.
 """
@@ -36,9 +43,21 @@ V1_BASE_LINE = 'const TMDB_BASE = "https://api.themoviedb.org/3";'
 V1_KEY_LINE = 'let apiKey = safeStorageGet("tmdb_key") || "";'
 
 
-def v1_patched():
+def v1_with_hotfix():
+    """Root index.html with the hotfix patch applied to a scratch copy, or None."""
+    import subprocess
+    scratch = V2 / ".cache" / "v1-hotfix.html"
+    scratch.parent.mkdir(parents=True, exist_ok=True)
+    scratch.write_bytes((ROOT / "index.html").read_bytes())
+    done = subprocess.run(["patch", "-s", str(scratch), str(V2 / "patches" / "v1-hotfix.patch")],
+                          capture_output=True)
+    return scratch.read_text(encoding="utf-8") if done.returncode == 0 else None
+
+
+def v1_patched(html=None):
     """The original page, pointed at the proxy. Two exact-line swaps, in memory."""
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    if html is None:
+        html = (ROOT / "index.html").read_text(encoding="utf-8")
     if V1_BASE_LINE not in html or V1_KEY_LINE not in html:
         return None
     html = html.replace(V1_BASE_LINE, 'const TMDB_BASE = location.origin + "/tmdb";')
@@ -99,6 +118,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(500, "Root index.html no longer has the lines the v1 patch swaps.")
             return self.send(200, html, TYPES[".html"])
 
+        if path in ("/plain", "/plain/"):
+            return self.send(200, (V2 / "index.html").read_bytes(), TYPES[".html"])
+
+        if path in ("/v1-hotfix", "/v1-hotfix/"):
+            fixed = v1_with_hotfix()
+            html = v1_patched(fixed) if fixed else None
+            if html is None:
+                return self.send(500, "v2/patches/v1-hotfix.patch no longer applies to the root index.html.")
+            return self.send(200, html, TYPES[".html"])
+
         rel = path.lstrip("/") or "index.html"
         target = (V2 / rel).resolve()
         if V2.resolve() not in target.parents or not target.is_file() or "/." in "/" + rel:
@@ -106,6 +135,18 @@ class Handler(BaseHTTPRequestHandler):
         if target.suffix == ".html":
             return self.send(200, v2_page(rel), TYPES[".html"])
         return self.send(200, target.read_bytes(), TYPES.get(target.suffix, "application/octet-stream"))
+
+
+    def do_POST(self):
+        import re
+        match = re.fullmatch(r"/__save/([a-z0-9_-]{1,40})", urllib.parse.urlsplit(self.path).path)
+        if not match:
+            return self.send(404, "Not found")
+        body = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 2_000_000))
+        target = V2 / ".cache" / "saved" / (match.group(1) + ".txt")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+        return self.send(200, "saved %d bytes" % len(body))
 
 
 if __name__ == "__main__":

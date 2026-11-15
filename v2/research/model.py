@@ -12,6 +12,7 @@ import unicodedata
 RANKS = [1, 3, 5, 10, 20, 30, 50, 100, 200, 500, 1000]
 REF_YEARS = range(2010, 2018)   # the years TMDB's vote counts peak; the "reference era"
 ERA_CORRECTION = 0.75           # 0 = raw votes (v1), 1 = same rank in any year counts the same
+VOICE_WEIGHT = 0.6              # a "(voice)" role counts this much of what its billing says
 KNOWN_LINK = 3000               # link strength at which an actor-film pair counts as well known
 BONUS_ZERO_AT = 20000           # link strength that earns no deep-cut bonus
 BONUS_FULL_AT = 150             # link strength that earns the full bonus
@@ -23,6 +24,7 @@ NON_FEATURE = re.compile(
     r"red[\s-]band trailer|teaser trailer|first look|table read)\b", re.I)
 SELF_RE = re.compile(r"\b(self|himself|herself|themself|themselves)\b", re.I)
 ARCHIVE_RE = re.compile(r"\barchive\b", re.I)
+VOICE_RE = re.compile(r"\bvoice\b", re.I)
 GENRE_DOCUMENTARY, GENRE_MUSIC, GENRE_TV_MOVIE = 99, 10402, 10770
 
 
@@ -95,7 +97,10 @@ def billing_weight(order):
 
 
 def link_strength(table, credit, alpha=ERA_CORRECTION):
-    return table.adjusted_votes(credit.get("vote_count") or 0, year_of(credit), alpha) * billing_weight(credit.get("order"))
+    weight = billing_weight(credit.get("order"))
+    if VOICE_RE.search(credit.get("character") or ""):
+        weight *= VOICE_WEIGHT
+    return table.adjusted_votes(credit.get("vote_count") or 0, year_of(credit), alpha) * weight
 
 
 def deep_cut_bonus(link):
