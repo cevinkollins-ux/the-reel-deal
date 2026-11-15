@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tmdbcache  # noqa: E402
 import model  # noqa: E402
 
-html = (tmdbcache.ROOT / "v2" / "index.html").read_text(encoding="utf-8")
+html = (tmdbcache.ROOT / "index.html").read_text(encoding="utf-8")
 grab = lambda name: json.loads(re.search(r"^const %s = (.*);$" % name, html, re.M).group(1))
 table = model.YearTable(grab("YEAR_VOTES"))
 ids = grab("ACTOR_IDS")

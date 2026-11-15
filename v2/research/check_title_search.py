@@ -26,7 +26,7 @@ WEEK = 7 * 24 * 3600
 
 def main():
     min_votes = int(sys.argv[1]) if len(sys.argv) > 1 else 2000
-    html = (tmdbcache.ROOT / "v2" / "index.html").read_text(encoding="utf-8")
+    html = (tmdbcache.ROOT / "index.html").read_text(encoding="utf-8")
     ids = json.loads(re.search(r"^const ACTOR_IDS = (.*);$", html, re.M).group(1))
     films, who = {}, {}
     with ThreadPoolExecutor(10) as ex:

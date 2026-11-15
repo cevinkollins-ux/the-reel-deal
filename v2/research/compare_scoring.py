@@ -22,7 +22,7 @@ import tmdbcache  # noqa: E402
 import model  # noqa: E402
 
 TODAY = datetime.now(ZoneInfo("America/New_York")).date().isoformat()
-html = (tmdbcache.ROOT / "v2" / "index.html").read_text(encoding="utf-8")
+html = (tmdbcache.ROOT / "index.html").read_text(encoding="utf-8")
 grab = lambda name: json.loads(re.search(r"^const %s = (.*);$" % name, html, re.M).group(1))
 TABLE = model.YearTable(grab("YEAR_VOTES"))
 IDS = grab("ACTOR_IDS")

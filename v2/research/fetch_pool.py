@@ -3,7 +3,7 @@
 
     python3 v2/research/fetch_pool.py <out.json>
 
-For every name in ACTORS (read from the root index.html): /search/person (the
+For every name in ACTORS (read from the original game, v1/index.html): /search/person (the
 app trusts results[0]) and that person's /movie_credits. Responses are cached
 under v2/.cache/, so a re-run within a day costs no API calls.
 """
@@ -41,7 +41,7 @@ def person(name):
 
 if __name__ == "__main__":
     out = Path(sys.argv[1])
-    html = (tmdbcache.ROOT / "index.html").read_text(encoding="utf-8")
+    html = (tmdbcache.ROOT / "v1" / "index.html").read_text(encoding="utf-8")
     actors = js_string_array(html, "ACTORS")
     directors = js_string_array(html, "DIRECTORS")
     collections = js_string_array(html, "COLLECTIONS")

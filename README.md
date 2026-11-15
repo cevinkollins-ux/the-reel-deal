@@ -1,5 +1,7 @@
 # The Reel Deal
 
+> **Which version is this?** The game at the repo root (`index.html`, what GitHub Pages serves) is **v2**: new scoring, ID-based actors, a new dealer and pre-dealt Dailies. What changed, and why, is in [`v2/README.md`](v2/README.md) and [`v2/FINDINGS.md`](v2/FINDINGS.md). The original game is kept unchanged at [`v1/index.html`](v1/index.html) (live at `/v1/`). **The rest of this README was written for the original**, so details such as the scoring formula, the category pool and the "Open issues" describe v1 and are out of date for v2; the v2 README has the differences.
+
 A single-file, browser-based movie trivia grid: 3 actors × 3 categories, and you name a film that satisfies each actor/category pairing. Play the Daily (one grid shared by everyone that day, so you can compete with friends), or deal a new grid whenever you want.
 
 ## How it works

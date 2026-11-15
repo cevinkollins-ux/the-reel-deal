@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the static data block that v2/index.html carries, and write it into the page.
+"""Build the static data block that index.html carries, and write it into the page.
 
     python3 v2/research/build_data.py            # print a summary, change nothing
     python3 v2/research/build_data.py --write    # replace the <generated-data> block
@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tmdbcache  # noqa: E402
 import model  # noqa: E402
 
-PAGE = tmdbcache.ROOT / "v2" / "index.html"
+PAGE = tmdbcache.ROOT / "index.html"
 FIRST_YEAR = 1915
 MIN_KNOWN_TO_DEAL = 4   # an actor needs this many well-known films to be dealt at random
 
@@ -210,7 +210,7 @@ def main():
     if "--write" in sys.argv:
         new, n = re.subn(r"// <generated-data>.*?// </generated-data>", lambda _: block, html, flags=re.S)
         if n != 1:
-            raise SystemExit("Expected exactly one <generated-data> block in v2/index.html")
+            raise SystemExit("Expected exactly one <generated-data> block in index.html")
         PAGE.write_text(new, encoding="utf-8")
         print("written to %s" % PAGE)
 

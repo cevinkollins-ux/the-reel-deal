@@ -3,11 +3,11 @@
 
     python3 v2/tools/dev_server.py [port]      (default 8744)
 
-  /            v2/index.html, with a one-line hook injected so the page talks
-               to the local TMDB proxy instead of needing a key pasted in
-  /plain/      v2/index.html exactly as GitHub Pages would serve it: no hook,
-               so it asks for a key like the original does
-  /v1/         the ORIGINAL root index.html, patched in memory the same way
+  /            index.html (the game), with a one-line hook injected so the page
+               talks to the local TMDB proxy instead of needing a key pasted in
+  /plain/      index.html exactly as GitHub Pages would serve it: no hook,
+               so it asks for a key
+  /v1/         the ORIGINAL game, v1/index.html, patched in memory the same way
                (the file on disk is never touched), for side-by-side checks
   /v1-hotfix/  the original with v2/patches/v1-hotfix.patch applied, also in
                memory only, to try the patch before deciding whether to apply it
@@ -31,7 +31,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tmdbcache  # noqa: E402
 
 ROOT = tmdbcache.ROOT
-V2 = ROOT / "v2"
+V2 = ROOT / "v2"            # research, tools, notes (the game itself is GAME)
+GAME = ROOT / "index.html"  # the live game: what GitHub Pages serves
+V1 = ROOT / "v1"            # the original game, kept at /v1/ on the live site
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".json": "application/json", ".css": "text/css", ".md": "text/plain; charset=utf-8",
          ".svg": "image/svg+xml", ".png": "image/png"}
@@ -44,11 +46,11 @@ V1_KEY_LINE = 'let apiKey = safeStorageGet("tmdb_key") || "";'
 
 
 def v1_with_hotfix():
-    """Root index.html with the hotfix patch applied to a scratch copy, or None."""
+    """v1/index.html with the hotfix patch applied to a scratch copy, or None."""
     import subprocess
     scratch = V2 / ".cache" / "v1-hotfix.html"
     scratch.parent.mkdir(parents=True, exist_ok=True)
-    scratch.write_bytes((ROOT / "index.html").read_bytes())
+    scratch.write_bytes((V1 / "index.html").read_bytes())
     done = subprocess.run(["patch", "-s", str(scratch), str(V2 / "patches" / "v1-hotfix.patch")],
                           capture_output=True)
     return scratch.read_text(encoding="utf-8") if done.returncode == 0 else None
@@ -57,7 +59,7 @@ def v1_with_hotfix():
 def v1_patched(html=None):
     """The original page, pointed at the proxy. Two exact-line swaps, in memory."""
     if html is None:
-        html = (ROOT / "index.html").read_text(encoding="utf-8")
+        html = (V1 / "index.html").read_text(encoding="utf-8")
     if V1_BASE_LINE not in html or V1_KEY_LINE not in html:
         return None
     html = html.replace(V1_BASE_LINE, 'const TMDB_BASE = location.origin + "/tmdb";')
@@ -66,8 +68,8 @@ def v1_patched(html=None):
     return html.replace(V1_KEY_LINE, 'let apiKey = "dev-proxy";')
 
 
-def v2_page(name):
-    html = (V2 / name).read_text(encoding="utf-8")
+def game_page(path):
+    html = path.read_text(encoding="utf-8")
     hook = '<script>window.REEL_DEAL_TMDB_PROXY = location.origin + "/tmdb";</script>'
     return html.replace("<head>", "<head>\n" + hook, 1)
 
@@ -115,25 +117,27 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/v1", "/v1/", "/v1/index.html"):
             html = v1_patched()
             if html is None:
-                return self.send(500, "Root index.html no longer has the lines the v1 patch swaps.")
+                return self.send(500, "v1/index.html no longer has the lines the v1 patch swaps.")
             return self.send(200, html, TYPES[".html"])
 
         if path in ("/plain", "/plain/"):
-            return self.send(200, (V2 / "index.html").read_bytes(), TYPES[".html"])
+            return self.send(200, GAME.read_bytes(), TYPES[".html"])
 
         if path in ("/v1-hotfix", "/v1-hotfix/"):
             fixed = v1_with_hotfix()
             html = v1_patched(fixed) if fixed else None
             if html is None:
-                return self.send(500, "v2/patches/v1-hotfix.patch no longer applies to the root index.html.")
+                return self.send(500, "v2/patches/v1-hotfix.patch no longer applies to v1/index.html.")
             return self.send(200, html, TYPES[".html"])
 
-        rel = path.lstrip("/") or "index.html"
+        rel = path.lstrip("/")
+        if rel in ("", "index.html"):
+            return self.send(200, game_page(GAME), TYPES[".html"])
         target = (V2 / rel).resolve()
         if V2.resolve() not in target.parents or not target.is_file() or "/." in "/" + rel:
             return self.send(404, "Not found")
         if target.suffix == ".html":
-            return self.send(200, v2_page(rel), TYPES[".html"])
+            return self.send(200, game_page(target), TYPES[".html"])
         return self.send(200, target.read_bytes(), TYPES.get(target.suffix, "application/octet-stream"))
 
 

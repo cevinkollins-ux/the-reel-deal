@@ -3,7 +3,7 @@
 
     python3 v2/research/audit_pool.py
 
-Reads ACTORS, DIRECTORS and COLLECTIONS from the root index.html, asks TMDB what
+Reads ACTORS, DIRECTORS and COLLECTIONS from the original game (v1/index.html), asks TMDB what
 the page itself would ask, and prints the numbers quoted in v2/FINDINGS.md:
 
   1. pool names TMDB spells differently (every answer for them is rejected)
@@ -53,8 +53,8 @@ def person(name):
 
 
 def main():
-    v1 = (ROOT / "index.html").read_text(encoding="utf-8")
-    v2 = (ROOT / "v2" / "index.html").read_text(encoding="utf-8")
+    v1 = (ROOT / "v1" / "index.html").read_text(encoding="utf-8")
+    v2 = (ROOT / "index.html").read_text(encoding="utf-8")
     actors = js_string_array(v1, "ACTORS")
     directors = js_string_array(v1, "DIRECTORS")
     collections_ = js_string_array(v1, "COLLECTIONS")

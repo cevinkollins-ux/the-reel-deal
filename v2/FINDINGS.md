@@ -2,8 +2,10 @@
 
 *Written 2026-11-13 to 2026-11-15. Everything here was measured against live
 TMDb data and, where it says "reproduced", in the real page. The original game
-(`index.html` at the repo root) was not changed. The fixes are in
-[`v2/index.html`](index.html).*
+is kept unchanged at [`v1/index.html`](../v1/index.html). The fixes are in the
+current game, [`index.html`](../index.html) at the repo root. (This was written
+while the new game still lived in `v2/`; where it says "v2", it means the
+current game.)*
 
 ## The short version
 
@@ -458,7 +460,7 @@ and a retry when TMDb rate-limits.
   endpoints the original doesn't call (`/discover/movie`, `/collection`,
   `/person/{id}`).
 - A real phone. The phone layout was checked in an emulated viewport only.
-- Opening `v2/index.html` straight from disk (`file://`).
+- Opening `index.html` straight from disk (`file://`).
 
 ## If you keep the original
 
@@ -466,10 +468,11 @@ and a retry when TMDb rate-limits.
 the Genre crash in three small changes, without changing what gets dealt, so
 Dailies, saved games and share links are unaffected. I tested it at
 `/v1-hotfix/` on the dev server: all four actors and the co-star case are
-accepted, and See All works on Genre after a reload. To apply it to `main`:
+accepted, and See All works on Genre after a reload. The original now lives at
+`v1/index.html`, so to apply it there:
 
 ```bash
-git checkout main && git show v2:v2/patches/v1-hotfix.patch | git apply
+git apply --directory=v1 v2/patches/v1-hotfix.patch
 ```
 
 It does not fix the wrong-film lookups, the dead categories or anything in
@@ -477,8 +480,9 @@ Part 2.
 
 ## Decisions that are yours
 
-1. **Apply the hotfix to the live game?** Two more affected Dailies are due on
-   Nov 28 and Nov 30.
+1. **Apply the hotfix to the original?** Since v2 became the live game, this
+   only matters to anyone still using `/v1/` (its Dailies on Nov 28 and Nov 30
+   are the two affected).
 2. **Franchise boundaries.** I made X-Men include the Wolverine and Deadpool
    films, Rocky include Creed, Star Wars include Rogue One, Solo and The Clone
    Wars, and John Wick include Ballerina. The Lord of the Rings does not

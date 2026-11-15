@@ -1,6 +1,6 @@
 """The v2 scoring model in Python, for research and for build_data.py.
 
-This mirrors the JavaScript in v2/index.html (search for "Link strength").
+This mirrors the JavaScript in index.html (search for "Link strength").
 The page is the source of truth for play; this copy exists so the model can be
 run over the whole actor pool offline. If you change a constant in one place,
 change it in the other.

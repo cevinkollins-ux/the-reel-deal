@@ -1,13 +1,12 @@
-# The Reel Deal v2
+# The Reel Deal v2: notes, research and tools
 
-An experimental second version of the game, kept apart from the original so the
-two can be compared. The root `index.html` is exactly as it was. Outside this
-folder only two things changed: `.gitignore` gained two lines (`.env` and
-`v2/.cache/`), and `.claude/launch.json` gained a `reel-deal-v2-dev` entry for
-the dev server (left uncommitted, next to your own uncommitted edit there).
+v2 is now the game. The game itself is [`index.html`](../index.html) at the repo
+root (still one file, no build step), which is what GitHub Pages serves at
+<https://cevinkollins-ux.github.io/the-reel-deal/>. The original game is kept,
+unchanged, at [`v1/index.html`](../v1/index.html), playable at `/the-reel-deal/v1/`.
+This folder holds the research and tooling behind v2.
 
 - **What was found, and why v2 does what it does:** [FINDINGS.md](FINDINGS.md)
-- **The game:** [index.html](index.html) (still one file, no build step)
 
 ## Trying it
 
@@ -22,10 +21,9 @@ game at <http://localhost:8744/v1/> for side-by-side checks, and the original
 with the optional hotfix at <http://localhost:8744/v1-hotfix/>. Neither changes
 any file.
 
-**The usual way:** open `v2/index.html` in a browser and paste a TMDb key, as
-with the original. If this branch is merged to `main`, GitHub Pages will serve
-it at `/the-reel-deal/v2/`, next to the original. On the same site the two
-share the saved key, so nobody has to paste it twice. Their Dailies are saved
+**The usual way:** open `index.html` in a browser and paste a TMDb key. On the
+live site the game is at the root and the original is at `/v1/`. They share the
+saved key, so nobody has to paste it twice, but their Dailies are saved
 separately.
 
 ## What's different from the original
@@ -50,7 +48,7 @@ names the film that was checked.
 
 ## Keeping it current
 
-Three things in `index.html` are snapshots of TMDb and want refreshing every
+Three things in the root `index.html` are snapshots of TMDb and want refreshing every
 month or two, and whenever `ACTORS`, `DIRECTORS` or `COLLECTIONS` change:
 
 ```bash
@@ -76,9 +74,11 @@ then run `research/crosscheck.py` to confirm the page and the script agree.
 ## What's in here
 
 ```
-index.html                 the game
+../index.html              the game (v2), served by GitHub Pages
+../v1/index.html           the original game, kept as it was
 FINDINGS.md                the audit and the scoring write-up
-patches/v1-hotfix.patch    optional three-line fix for the original (not applied)
+patches/v1-hotfix.patch    optional three-line fix for the original (not applied;
+                           apply with: git apply --directory=v1 v2/patches/v1-hotfix.patch)
 tools/dev_server.py        local server: static files + TMDb proxy that adds the key
 tools/tmdbcache.py         TMDb client with a one-day disk cache (v2/.cache/, ignored by git)
 research/build_data.py     builds the <generated-data> block in index.html
