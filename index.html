@@ -464,15 +464,12 @@
   </header>
 
   <div class="setup">
-    <label for="apiKey">TMDb API key (v3 auth, kept only in this browser)</label>
     <div class="row">
-      <input type="password" id="apiKey" placeholder="Paste your TMDb API key">
-      <button id="saveKey">Save key</button>
-      <button id="dailyPuzzle" disabled>Today's Daily</button>
-      <button id="newPuzzle" class="secondary" disabled>Deal a new puzzle</button>
-      <label class="sandbox-toggle"><input type="checkbox" id="sandboxToggle" disabled> Sandbox mode</label>
+      <button id="dailyPuzzle">Today's Daily</button>
+      <button id="newPuzzle" class="secondary">Deal a new puzzle</button>
+      <label class="sandbox-toggle"><input type="checkbox" id="sandboxToggle"> Sandbox mode</label>
     </div>
-    <div class="status-line" id="statusLine">Get a free key at themoviedb.org → Settings → API, then paste it above.</div>
+    <div class="status-line" id="statusLine">Ready to deal a puzzle.</div>
   </div>
 
   <div id="game" style="display:none;">
@@ -966,8 +963,11 @@ function safeStorageSet(key, value){
   try{ localStorage.setItem(key, value); return true; } catch(err){ return false; }
 }
 
-let apiKey = safeStorageGet("tmdb_key") || "";
-const hasTmdbAccess = () => !!TMDB_PROXY || !!apiKey;
+// The site's own TMDb key, built in so friends never have to fetch one. It's
+// visible to anyone who views the page source; that risk is accepted (the site
+// is only shared with friends). If it ever gets abused, revoke it at
+// themoviedb.org → Settings → API and put a new one here.
+const apiKey = "3ed938813c7ecdc8f7f157d3c1930b14";
 let puzzle = null; // {actors:[3], categories:[3]}
 let cellAnswers = {}; // "r-c" -> {title, id, points}
 let usedMovieIds = new Set();
@@ -979,39 +979,6 @@ let gridLocked = false; // true once a Daily's answers have been revealed — no
 let sandboxCellCounts = {}; // "r-c" -> valid-answer count, kept in sync by refreshSandboxCell
 
 const el = id => document.getElementById(id);
-
-el("apiKey").value = apiKey;
-if(TMDB_PROXY){
-  // Nothing to paste: hide the key box and leave just the buttons.
-  el("apiKey").style.display = "none";
-  el("saveKey").style.display = "none";
-  document.querySelector('label[for="apiKey"]').style.display = "none";
-}
-if(hasTmdbAccess()){
-  el("statusLine").textContent = TMDB_PROXY ? "Ready to deal a puzzle." : "Key loaded from this browser. Ready to deal a puzzle.";
-  el("newPuzzle").disabled = false;
-  el("dailyPuzzle").disabled = false;
-  el("sandboxToggle").disabled = false;
-}
-
-el("saveKey").addEventListener("click", () => {
-  apiKey = el("apiKey").value.trim();
-  if(!apiKey){ el("statusLine").textContent = "Enter a key first."; return; }
-  const persisted = safeStorageSet("tmdb_key", apiKey);
-  el("statusLine").textContent = persisted
-    ? "Key saved. Ready to deal a puzzle."
-    : "Key set for this session — this browser isn't letting the page save data, so you'll need to paste it again next time you open the page. Ready to deal a puzzle.";
-  el("newPuzzle").disabled = false;
-  el("dailyPuzzle").disabled = false;
-  el("sandboxToggle").disabled = false;
-  if(pendingSharedGrid){
-    const grid = pendingSharedGrid;
-    pendingSharedGrid = null;
-    startShared(grid);
-  } else if(!puzzle){
-    startDaily();
-  }
-});
 
 el("newPuzzle").addEventListener("click", dealPuzzle);
 
@@ -1028,7 +995,7 @@ async function tmdb(path, params={}){
     await new Promise(resolve => setTimeout(resolve, 600 * (attempt + 1)));
   }
   if(!res.ok){
-    if(res.status === 401) throw new Error("TMDb rejected the API key.");
+    if(res.status === 401) throw new Error("TMDb rejected the site's API key — it may have been revoked.");
     throw new Error("TMDb request failed (" + res.status + ")");
   }
   return res.json();
@@ -1645,10 +1612,6 @@ const LAB_SLIDERS = [
 const lab = {actor: null, sortKey: "link", sortDir: "desc", settings: {...SCORING}};
 
 function openLab(){
-  if(!hasTmdbAccess()){
-    openModal("Scoring lab", `<div class="modal-status">Save a TMDb key first — the lab reads live filmographies.</div>`);
-    return;
-  }
   if(!lab.actor) lab.actor = (puzzle && puzzle.actors.find(Boolean)) || "Emma Thompson";
   const sliders = LAB_SLIDERS.map(sl =>
     `<label>${sl.label} <span class="lab-value" id="labVal-${sl.key}"></span>
@@ -2517,18 +2480,11 @@ function startShared(grid){
   el("statusLine").textContent = "Loaded today's Daily from a friend's link — your progress on it is saved as usual.";
 }
 
-let pendingSharedGrid = null; // a link opened before an API key was saved
-
 function handleUrlGrid(){
   const shared = takeSharedGridFromUrl();
   if(shared === undefined) return false;
   if(shared === null){
     el("statusLine").textContent = "That grid link looks broken or incomplete — ask for it again, or deal a puzzle.";
-    return true;
-  }
-  if(!hasTmdbAccess()){
-    pendingSharedGrid = shared;
-    el("statusLine").textContent = "Someone shared a grid with you — paste your TMDb key above and click Save key to play it.";
     return true;
   }
   startShared(shared);
@@ -3287,7 +3243,7 @@ function refreshUsedList(){
 }
 
 // ---------- On load: a shared grid link wins; otherwise go straight to today's Daily ----------
-if(!handleUrlGrid() && hasTmdbAccess()) startDaily();
+if(!handleUrlGrid()) startDaily();
 
 // A tab left open overnight still shows yesterday's Daily. Say so when the
 // player comes back to it, rather than letting them play on unawares.

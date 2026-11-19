@@ -7,7 +7,7 @@ A single-file, browser-based movie trivia grid: 3 actors × 3 categories, and yo
 ## How it works
 
 - Open `index.html` directly in a browser — no build step, no server required.
-- Paste a free [TMDb](https://www.themoviedb.org) API key (v3 auth) into the setup box. It's saved only in that browser's `localStorage`.
+- No key to paste: the site's own [TMDb](https://www.themoviedb.org) API key (v3 auth) is built into `index.html` (the `apiKey` constant). Anyone who views the page source can read it; that's an accepted risk, since the site is only shared with friends. If it's ever abused, revoke it in TMDb → Settings → API and put a new one in. (The original at `v1/` still asks for a key.)
 - Click **Deal a new puzzle** to get 3 random actors and 3 random categories. Every actor × category cell is checked against real TMDb filmographies before the puzzle is shown, so you're never stuck on an impossible pairing (if a trio of actors can't yield 3 solvable categories, it re-samples a new trio automatically).
 - Type a film title into a cell — an autocomplete dropdown (powered by TMDb search) helps you pick the right one. Submit to check it.
 - Scoring per correct cell: 50 points for a valid answer + 1–50 rarity points on a log scale of the film's TMDb vote count (obscure picks score higher). Each film can only be used once per grid.
@@ -36,7 +36,6 @@ A single-file, browser-based movie trivia grid: 3 actors × 3 categories, and yo
 - The whole grid lives in the link (`#g=` followed by base64-encoded JSON of the 3 actor names, the 3 `[type, value]` categories, and the Daily's date if it is one). Everything in a link is checked against the same fixed actor/category lists the dealer uses, and anything else is rejected.
 - A link to **today's Daily** becomes your Daily, with progress saved as usual. That's the fix if your Daily ever came out different from a friend's. If you'd already answered cells on a different grid, it asks before replacing it.
 - A link to an older Daily, or to any non-Daily grid, opens as a one-off **Shared grid**, and progress on it isn't saved.
-- If someone opens a link before pasting their TMDb key, the grid loads as soon as they save one.
 
 ## Sandbox mode
 
@@ -107,10 +106,12 @@ Before showing a puzzle, it fetches real filmographies for the 3 sampled actors 
 
 ## Getting a TMDb API key
 
+You only need one to replace the built-in key, to play the original at `v1/`, or to run `inspect_tmdb.py`.
+
 1. Create a free account at [themoviedb.org/signup](https://www.themoviedb.org/signup).
 2. Go to your profile → **Settings** → **API**.
 3. Click **Create** under "Request an API Key," choose **Developer**, and fill in the short form (any personal/non-commercial description works).
-4. Copy the **API Key (v3 auth)** string and paste it into the app.
+4. Copy the **API Key (v3 auth)** string.
 
 ## Notes / known limitations
 
